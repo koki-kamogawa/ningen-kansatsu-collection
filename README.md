@@ -9,3 +9,5 @@
 ## ライセンス表記
 
 3D表示に [three.js](https://threejs.org/)（MIT License）を同梱しています。`lib/LICENSE-three.txt` を参照してください。
+
+線画アイコンに [Lucide](https://lucide.dev/)（ISC License）を使っています。`lib/LICENSE-lucide.txt` を参照してください。

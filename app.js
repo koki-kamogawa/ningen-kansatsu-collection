@@ -1,5 +1,8 @@
 import * as THREE from './lib/three.module.js';
 import { OrbitControls } from './lib/OrbitControls.js';
+import { buildAvatar, applyPose } from './avatar.js';
+import { createStage } from './formstage.js';
+import { ic } from './icons.js';
 
 /* =========================================================
    人間観察コレクション
@@ -53,9 +56,9 @@ const GUESS = [
 ];
 const PLACES = ['駅・電車', 'カフェ', '職場', '学校', '街なか', 'お店', '公園', 'その他'];
 const LOOK = {
-  clothes: ['#C8432B', '#E39B3B', '#E8CF6A', '#6F9E5B', '#3F7F8C', '#3E5C8A', '#2B2B2B', '#EDE9E1', '#8B6B4A', '#C97C9A', '#8C949C', '#7A5C99'],
-  hair: ['#2A2523', '#5A3E2B', '#9A6B3F', '#D8B46A', '#D9D6D0', '#9C4A2E'],
-  skin: ['#F2D5BC', '#E6BC98', '#C99670', '#8D5E3F'],
+  clothes: ['#2C3E5A', '#4A86A8', '#A9D2EE', '#F2ECDD', '#9A9A9A', '#333A3F', '#76884F', '#D8C4A0', '#E3B23C', '#CC6B33', '#A94A42', '#8F5F9C'],
+  hair: ['#2A2826', '#5A3F2E', '#A8683C', '#C98C4B', '#D3B27A', '#A9A6A0'],
+  skin: ['#F8DCC4', '#F2C9A0', '#DDA56C', '#A87349'],
   styles: [['short', '短い'], ['long', '長い'], ['bun', 'おだんご'], ['cap', '帽子'], ['bald', 'ぼうず']],
   sizes: [['s', '小柄'], ['m', 'ふつう'], ['l', '大柄']],
 };
@@ -154,7 +157,89 @@ function sceneHit(key, at, text) {
   if (quiet) return;
   shotQueue.push({ key, x: at.x, z: at.z, t: .7 });
   const def = SCENES.find(x => x[0] === key);
-  setTimeout(() => toast(`名場面「${def[1]}」がアルバムに入りました（${Object.keys(ROOT.album).length}/${SCENES.length}）`), 900);
+  setTimeout(() => toast(`名場面「${def[1]}」 ${Object.keys(ROOT.album).length}/${SCENES.length}`, SCENE_PIC[key]), 900);
+}
+
+// ---------- 絵と見出し ----------
+// 出来事は「絵＋短い見出し＋続きが気になる1文」で見せる。長い記録文は日記にだけ残す
+const PIC = {
+  era0: '<rect x="12" y="46" width="40" height="7" rx="3.5" transform="rotate(-10 32 50)"/><rect x="12" y="46" width="40" height="7" rx="3.5" transform="rotate(10 32 50)"/><path class="a" d="M32 8c3 10 15 15 15 28a15 15 0 0 1-30 0c0-7 4-10 6-15 2 3 3 5 5 6 2-6 1-12 4-19z"/><path class="w" d="M32 26c2 6 7 8 7 14a7 7 0 0 1-14 0c0-5 5-8 7-14z"/>',
+  era1: '<g transform="rotate(40 32 32)"><rect x="27.500" y="20" width="9" height="42" rx="4"/><rect x="9" y="5" width="46" height="20" rx="3" class="a"/><rect x="25" y="5" width="14" height="20"/></g>',
+  era2: '<circle cx="32" cy="32" r="25" class="a"/><circle cx="32" cy="32" r="19" class="lw"/><path class="lw" d="M23 21l9 12 9-12M32 33v13M24 35h16M24 42h16"/>',
+  era3: '<path class="l" d="M32 3v8"/><rect x="24" y="9" width="16" height="6" rx="2"/><ellipse cx="32" cy="32" rx="21" ry="18" class="a"/><path class="lw" d="M12 26h40M11 33h42M13 40h38"/><rect x="24" y="49" width="16" height="6" rx="2"/><path class="l" d="M28 55v6M36 55v6"/>',
+  era4: '<path d="M32 16C25 9 14 9 6 11v39c8-2 19-2 26 5 7-7 18-7 26-5V11c-8-2-19-2-26 5z"/><path class="w" d="M29 20c-5-4-12-5-19-4v29c7-1 14 0 19 3zM35 20c5-4 12-5 19-4v29c-7-1-14 0-19 3z"/><path class="la" d="M41 24c3-.8 6-1 9-1M41 31c3-.8 6-1 9-1M41 38c3-.8 6-1 9-1"/>',
+  era5: '<rect x="29" y="24" width="6" height="34" rx="2"/><rect x="20" y="55" width="24" height="6" rx="3"/><path d="M21 22h22l-4-13H25z"/><circle cx="32" cy="17" r="5" class="a"/><path class="la" d="M12 12l5 3M52 12l-5 3M9 25h6M55 25h-6M14 37l5-3M50 37l-5-3"/>',
+  storm: '<path d="M18 40a11 11 0 0 1-1-22 15 15 0 0 1 28-3 12 12 0 0 1 2 25z"/><path class="a" d="M35 30L24 47h8l-4 14 13-19h-8l5-12z"/><path class="l" d="M15 47l-3 8M50 47l-3 8"/>',
+  bounty: '<path d="M33 18c1-6 5-10 11-11 0 7-4 11-11 11z"/><path class="l" d="M32 21c0-3-1-6-3-8"/><path class="a" d="M32 22c-5-4-20-3-20 14 0 13 9 23 15 23 2 0 3-1 5-1s3 1 5 1c6 0 15-10 15-23 0-17-15-18-20-14z"/>',
+  stars: '<path class="a" d="M42 6l5 13 14 .8-11 9 3.700 13.600-11.700-7.600-11.700 7.600 3.700-13.600-11-9 14-.8z"/><path class="l" d="M23 37L6 54M31 45L18 58M16 30L5 41"/>',
+  market: '<path class="a" d="M8 9h48l5 17H3z"/><path class="w" d="M20 9h8l-2 17h-11zM36 9h8l5 17H38z"/><rect x="9" y="30" width="5" height="29"/><rect x="50" y="30" width="5" height="29"/><rect x="9" y="42" width="46" height="6"/>',
+  festival: '<path class="l" d="M32 32V6M32 32v26M32 32H6M32 32h26M32 32L14 14M32 32l18 18M32 32l18-18M32 32L14 50"/><circle cx="32" cy="32" r="7" class="a"/><circle cx="32" cy="5" r="3.500" class="a"/><circle cx="59" cy="32" r="3.500" class="a"/><circle cx="32" cy="59" r="3.500" class="a"/><circle cx="5" cy="32" r="3.500" class="a"/><circle cx="51" cy="13" r="3.500"/><circle cx="51" cy="51" r="3.500"/><circle cx="13" cy="51" r="3.500"/><circle cx="13" cy="13" r="3.500"/>',
+  puppy: '<ellipse cx="32" cy="43" rx="15" ry="13" class="a"/><ellipse cx="13" cy="29" rx="6" ry="8"/><ellipse cx="51" cy="29" rx="6" ry="8"/><ellipse cx="25" cy="15" rx="6" ry="9"/><ellipse cx="39" cy="15" rx="6" ry="9"/>',
+  birthday: '<rect x="30" y="12" width="4" height="13"/><path class="a" d="M32 2c3 4 4 6 4 8a4 4 0 0 1-8 0c0-2 1-4 4-8z"/><rect x="11" y="25" width="42" height="17" rx="4"/><rect x="6" y="40" width="52" height="19" rx="4" class="a"/><path class="lw" d="M6 49c5 4 8 4 13 0s8-4 13 0 8 4 13 0 8-4 13 0"/>',
+  house: '<path class="a" d="M32 6L3 31h9l20-17 20 17h9z"/><path d="M12 31l20-17 20 17v28H12z"/><rect x="26" y="39" width="12" height="20" rx="1" class="w"/>',
+  level: '<path d="M2 58c10-18 18-22 26-15 6-12 20-12 34 15z"/><rect x="28" y="6" width="4" height="36"/><path class="a" d="M32 7l23 9-23 9z"/>',
+  friends: '<circle cx="20" cy="25" r="10"/><path d="M3 58c0-13 8-21 17-21s17 8 17 21z"/><circle cx="46" cy="29" r="8"/><path d="M34 58c2-11 6-17 12-17s13 6 15 17z"/><path class="a" d="M33 16c-3-5-11-4-11 3 0 5 6 9 11 13 5-4 11-8 11-13 0-7-8-8-11-3z" transform="translate(0 -9)"/>',
+  bestie: '<path class="a" d="M32 56C14 43 5 34 5 22 5 8 23 3 32 16 41 3 59 8 59 22c0 12-9 21-27 34z"/>',
+  argue: '<path class="a" d="M32 3l6 15 15-7-5 16 14 5-14 6 6 16-16-5-6 13-6-13-16 5 6-16L2 32l14-5-5-16 15 7z"/><path class="lw" d="M26 24l12 16M38 24L26 40"/>',
+  coin: '<circle cx="32" cy="32" r="25" class="a"/><circle cx="32" cy="32" r="18" class="lw"/>',
+  leaf: '<path class="a" d="M54 8C24 8 9 22 11 46c24 3 43-10 43-38z"/><path class="lw" d="M43 19L18 44"/><path class="l" d="M15 47L6 58"/>',
+  people: '<circle cx="32" cy="20" r="13"/><path class="a" d="M8 60c0-16 11-25 24-25s24 9 24 25z"/>',
+  sun: '<circle cx="32" cy="32" r="14" class="a"/><path class="l" d="M32 5v8M32 51v8M5 32h8M51 32h8M13 13l6 6M45 45l6 6M51 13l-6 6M19 45l-6 6"/>',
+  bird: '<path d="M6 34c8-11 19-14 28-10 3-8 11-11 18-7l7 2-7 4c0 15-13 26-29 24L10 56l5-13z"/><path class="a" d="M26 35c7 0 13-3 17-8-1 10-8 17-17 17z"/>',
+  music: '<path class="a" d="M24 12l28-6v8l-28 6z"/><rect x="24" y="12" width="5" height="36"/><rect x="47" y="6" width="5" height="36"/><ellipse cx="18" cy="49" rx="11" ry="9"/><ellipse cx="41" cy="43" rx="11" ry="9"/>',
+  bench: '<rect x="6" y="14" width="52" height="8" rx="3" class="a"/><rect x="6" y="26" width="52" height="8" rx="3" class="a"/><rect x="4" y="38" width="56" height="7" rx="3"/><rect x="11" y="10" width="5" height="46"/><rect x="48" y="10" width="5" height="46"/>',
+  well: '<path class="a" d="M6 22L32 6l26 16z"/><rect x="11" y="22" width="4" height="22"/><rect x="49" y="22" width="4" height="22"/><path class="l" d="M32 22v14"/><rect x="26" y="34" width="12" height="9" rx="2" class="a"/><rect x="7" y="44" width="50" height="15" rx="3"/>',
+  path: '<ellipse cx="18" cy="51" rx="13" ry="8"/><ellipse cx="42" cy="38" rx="12" ry="7" class="a"/><ellipse cx="21" cy="24" rx="10" ry="6"/><ellipse cx="41" cy="11" rx="9" ry="5" class="a"/>',
+  flower: '<rect x="30" y="34" width="4" height="26"/><path d="M32 52c-3-8-10-11-19-11 1 9 9 14 19 11z"/><circle cx="32" cy="9" r="8" class="a"/><circle cx="17" cy="20" r="8" class="a"/><circle cx="47" cy="20" r="8" class="a"/><circle cx="23" cy="34" r="8" class="a"/><circle cx="41" cy="34" r="8" class="a"/><circle cx="32" cy="22" r="7"/>',
+  tower: '<path class="a" d="M12 16h40l-5-10H17z"/><rect x="12" y="16" width="40" height="7"/><path class="l" d="M18 23L10 60M46 23l8 37M16 37h32M13 50h38"/>',
+  field: '<path d="M4 58c4-10 12-16 28-16s24 6 28 16z"/><path class="la" d="M32 40V12M22 40V20M42 40V20"/><path class="a" d="M32 8c5 3 6 8 0 14-6-6-5-11 0-14zM22 16c4 3 5 7 0 12-5-5-4-9 0-12zM42 16c4 3 5 7 0 12-5-5-4-9 0-12z"/>',
+  note: '<rect x="8" y="6" width="48" height="52" rx="5" width="48" height="52" rx="5"/><path class="lw" d="M18 21h28M18 32h28M18 43h17"/>',
+};
+// 文節の切れ目でだけ改行する（Safariは自動で文節を判断しない）
+const wb = s => esc(s).replace(/([、。」]|[がをにはとでへも](?=[一-龠ァ-ヶ「]))/g, '$1<wbr>');
+// 絵はそのものの色で見せる（りんごは赤、葉は緑）。読まなくても何の出来事か分かるように
+const PIC_COL = { era0: '#F08A2C', era1: '#E8A33D', era2: '#F2B31E', era3: '#E5484D', era4: '#2F8FB5', era5: '#F2B31E', storm: '#F2B31E', bounty: '#E5484D', stars: '#F2B31E', market: '#2FA39B', festival: '#E8609A', puppy: '#C98A4B', birthday: '#EE6C93', house: '#E8743B', level: '#3FA66A', friends: '#EE6C93', bestie: '#E5484D', argue: '#F08A2C', coin: '#F2B31E', sun: '#F2B31E', leaf: '#4FA85E', people: '#2F8FB5', bird: '#2F8FB5', music: '#7A6BD1', bench: '#B9793F', well: '#2F8FB5', path: '#A89A86', flower: '#EE6C93', tower: '#B9793F', field: '#D9A62B' };
+const pic = (k, size) => `<svg class="pic" width="${size}" height="${size}" viewBox="0 0 64 64" style="--a:${PIC_COL[k] || 'var(--stamp)'}" aria-hidden="true">${PIC[k] || PIC.note}</svg>`;
+const BUILD_PIC = { '畑': 'field', 'ベンチ': 'bench', '井戸': 'well', '見晴らし台': 'tower', '石の小道': 'path', '街灯': 'era5', '花壇': 'flower', '屋台': 'market', '学校': 'era4' };
+const SCENE_PIC = { first_talk: 'friends', friends: 'friends', bestie: 'bestie', opposites: 'bestie', argue: 'argue', awkward: 'argue', make_up: 'friends', three_talk: 'people', bench_two: 'bench', explore_pair: 'tower', care: 'bounty', night_owl: 'stars', early: 'sun', sleep_outside: 'era0', bird: 'bird', music: 'music', find: 'stars', plant: 'leaf', harvest: 'field', first_house: 'house', path: 'path', well: 'well', stall: 'market', tower: 'tower', level1: 'level', level3: 'level', level5: 'level', full_house: 'people', move_in: 'house', reunion: 'friends', era1: 'era1', era2: 'era2', era3: 'era3', era4: 'era4', era5: 'era5', storm: 'storm', bounty: 'bounty', stars: 'stars', market: 'market', festival: 'festival', puppy: 'puppy', birthday: 'birthday', upgrade: 'house', gift: 'coin', lend: 'coin', repay: 'coin' };
+const ERA_NEWS = [null,
+  { h: '道具が生まれた', s: a => `${a}が石と木をくっつけた。仕事が一気に速くなる` },
+  { h: 'お金が生まれた', s: a => `${a}が貝がらに印をつけた。これ1枚で、ごはんが買える` },
+  { h: '祭りの日ができた', s: a => `「みんなで集まろう」と${a}。5日ごとに島がにぎやかになる` },
+  { h: '学びの時代がきた', s: a => `教えたがりの${a}が動いた。もうすぐ学校が建つ` },
+  { h: '夜が明るくなった', s: a => `${a}が灯りを思いついた。もう夜道はこわくない` },
+];
+function story(e) {
+  const t = e.text, [a, b] = [...t.matchAll(/\u0001\d+\u0002/g)].map(m => fmt(m[0])), hit = (re) => t.match(re);
+  const pair = `${a}と${b}`; let m;
+  const era = ERAS.findIndex((E, i) => i && t.includes(`「${E.name}」に入った`));
+  if (era > 0) return { ic: 'era' + era, tone: 'era', h: ERA_NEWS[era].h, s: ERA_NEWS[era].s(a) };
+  if ((m = hit(/ここは「(.+)」になった/))) return { ic: 'level', tone: 'era', h: `「${m[1]}」になった`, s: '島がひとまわり広がった。建てられる場所が増えた' };
+  if (hit(/嵐が来た/)) return { ic: 'storm', tone: 'sky', h: '嵐が島を直撃', s: 'みんな家や焚き火のそばへ逃げこんだ' };
+  if ((m = hit(/木が(\d+)本倒れて/))) return { ic: 'storm', tone: 'sky', h: `嵐で木が${m[1]}本倒れた`, s: 'また植えてくれる人は、いるだろうか' };
+  if (hit(/豊作/)) return { ic: 'bounty', tone: 'leaf', h: '今日は大豊作', s: '木の実が島じゅうに。みんな食べ放題' };
+  if (hit(/流れ星/)) return { ic: 'stars', tone: 'sky', h: '流れ星の夜', s: 'いくつも降った。だれか願いごとをしたかな' };
+  if (hit(/市場の日/)) return { ic: 'market', tone: 'warm', h: '市場がにぎわった', s: '屋台に人だかり。財布のひもがゆるむ日' };
+  if (hit(/はじめての祭り/)) return { ic: 'festival', tone: 'warm', h: 'はじめての祭り', s: '焚き火のまわりで、みんなが踊った' };
+  if (hit(/祭りが終わった/)) return { ic: 'festival', tone: 'warm', h: `一番踊ったのは${a}`, s: '祭りのあとも、しばらくこの話でもちきり' };
+  if (hit(/祭りの日/)) return { ic: 'festival', tone: 'warm', h: '今日は祭りの日', s: '焚き火のまわりに、みんなが集まった' };
+  if ((m = hit(/島に来て(\d+)日/))) return { ic: 'birthday', tone: 'warm', h: `${a}、島に来て${m[1]}日`, s: '友だちが集まってお祝いした' };
+  if (hit(/子犬/)) return { ic: 'puppy', tone: 'warm', h: '子犬がやってきた', s: `${a}のあとをついて歩いている` };
+  if (hit(/の家ができた/)) return { ic: 'house', tone: 'leaf', h: `${a || 'だれか'}の家ができた`, s: '今夜から、屋根の下で眠れる' };
+  if ((m = hit(/^(.+)ができた。言い出したのは/))) return { ic: BUILD_PIC[m[1]] || 'house', tone: 'leaf', h: `${m[1]}ができた`, s: `言い出したのは${a || 'だれか'}` };
+  if ((m = hit(/家を(.+)にした/))) return { ic: 'house', tone: 'leaf', h: `${a}の家が${m[1]}に`, s: 'ためたお金をつぎこんだ' };
+  if (hit(/もう親友/)) return { ic: 'bestie', tone: 'warm', h: `${pair}は親友`, s: 'もう、どこへ行くのも一緒だ' };
+  if (hit(/仲直り/)) return { ic: 'friends', tone: 'warm', h: `${pair}が仲直り`, s: '先に声をかけたのは、どっちだろう' };
+  if (hit(/仲良くなった/)) return { ic: 'friends', tone: 'warm', h: `${pair}が仲良しに`, s: '話しこむ姿を、よく見かける' };
+  if (hit(/気まずい/)) return { ic: 'argue', tone: 'sky', h: `${pair}が気まずい`, s: '目を合わせなくなった。何があった？' };
+  if (hit(/言い合い/)) return { ic: 'argue', tone: 'sky', h: `${pair}が言い合い`, s: '原因は、たぶん、ささいなこと' };
+  if (hit(/はじめて言葉/)) return { ic: 'friends', tone: 'warm', h: `${pair}が初めて会話`, s: 'さて、気が合うかどうか' };
+  if (hit(/返した/)) return { ic: 'coin', tone: 'era', h: `${a}が借金を返した`, s: `相手は${b}。律儀な人だ` };
+  if (hit(/お金を貸した/)) return { ic: 'coin', tone: 'era', h: `${a}がお金を貸した`, s: `相手は${b}。ちゃんと返ってくるかな` };
+  if (hit(/おごった/)) return { ic: 'coin', tone: 'era', h: `${a}がお茶をおごった`, s: `相手は${b}。太っ腹な人だ` };
+  if (hit(/木の実を分けた/)) return { ic: 'bounty', tone: 'leaf', h: `${a}のおすそわけ`, s: `お腹をすかせた${b}に、木の実を分けた` };
+  if (hit(/苗を植えた/)) return { ic: 'leaf', tone: 'leaf', h: `${a}が木を植えた`, s: '何年かしたら、ここに木かげができる' };
+  return { ic: e.k === 'born' ? 'people' : 'note', tone: 'leaf', h: fmt(t).split('。')[0], s: '' };
 }
 
 // ---------- 小道具 ----------
@@ -505,6 +590,7 @@ function prep(p) {
 }
 
 function moveTo(p, tx, tz, dt, stop = 0) {
+  if (!Number.isFinite(tx) || !Number.isFinite(tz)) return true;
   const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
   const sp = (.5 + p.traits.act * .75) * (p.carry ? .85 : 1) * (p.needs.hunger > .95 ? .7 : 1), st = sp * dt;
   if (d <= stop + st || d < .02) { if (stop === 0) { p.x = tx; p.z = tz; } p.moving = false; return true; }
@@ -566,7 +652,7 @@ function arrive(p, a) {
     case 'food': { const o = S.bushes.find(b => b.id === a.oid); if (!o || !o.berries) return endAct(p); face(p, o); a.t = 2.6; break; }
     case 'harvest': a.t = 4; break;
     case 'build': { const s = sById(a.sid); if (!s || s.done) return endAct(p); face(p, s.type === 'path' ? pathMid(s) : s); a.t = 9 + p.traits.tidy * 5; (s.helpers ||= []).includes(p.id) || s.helpers.push(p.id); break; }
-    case 'explore': { a.t = rand(3, 5); bubble(p, pick(['👀', '☁️', '🌿'])); const o = p.traits.cur > .62 && S.people.find(o => o !== p && o.traits.cur > .62 && o.act && o.act.k === 'explore' && dist(o, p) < 4); if (o) sceneHit('explore_pair', p, `${nm(p)}と${nm(o)}が一緒に島のはしを探検した`); break; }
+    case 'explore': { a.t = rand(3, 5); bubble(p, pick(['☁️', '🌿', '🍃'])); const o = p.traits.cur > .62 && S.people.find(o => o !== p && o.traits.cur > .62 && o.act && o.act.k === 'explore' && dist(o, p) < 4); if (o) sceneHit('explore_pair', p, `${nm(p)}と${nm(o)}が一緒に島のはしを探検した`); break; }
     case 'wander': a.t = rand(1.5, 4); break;
     case 'sit': { a.t = rand(9, 16); const b = sById(a.sid); if (b) p.dir = b.rot; break; }
     case 'plant': a.t = 3; break;
@@ -846,7 +932,7 @@ function checkEra(dt) {
   addLog(`${nm(inv)}が${E.idea}。島は「${E.name}」に入った。${E.after}`, inv.id, 'level');
   sceneHit('era' + S.era, inv, `${nm(inv)}が${E.idea}`);
   bubble(inv, '💡');
-  if (!quiet) setTimeout(() => stampShow(E.name, `${shortName(inv)}の思いつき`, '時代が変わった'), 400);
+  if (!quiet) setTimeout(() => stampShow(E.name, `${shortName(inv)}の思いつき`, '時代が変わった', 'era' + S.era), 400);
 }
 function goal() {
   const era = S.era || 0;
@@ -872,7 +958,7 @@ function onNewDay() {
 }
 function startEv(k, t0, t1, data = {}) { S.ev = { k, t0, t1, data, on: false, done: false, did: [] }; }
 const evOn = k => S.ev && S.ev.on && !S.ev.done && (!k || S.ev.k === k);
-function evLog(text, k, at) { addLog(text, null, 'event'); sceneHit(k, at || { x: 0, z: 0 }, text); if (!quiet) toast(text); }
+function evLog(text, k, at) { addLog(text, null, 'event'); sceneHit(k, at || { x: 0, z: 0 }, text); if (!quiet) { const st = story({ text }); toast(st.h, st.ic); } }
 function runEvent() {
   const e = S.ev; if (!e || e.done) return;
   if (!e.on && S.time >= e.t0 && S.time < e.t1 + .05) {
@@ -908,10 +994,10 @@ function runEvent() {
 function eventAct(p) {
   const e = S.ev; if (!evOn() || e.did.includes(p.id)) return false;
   switch (e.k) {
-    case 'storm': e.did.push(p.id); setAct(p, 'shelter'); return true;
+    case 'storm': e.did.push(p.id); setAct(p, 'shelter'); prep(p); return true;
     case 'stars': e.did.push(p.id); setAct(p, 'look'); p.act.ph = 'work'; p.act.t = 1e9; return true;
-    case 'festival': e.did.push(p.id); setAct(p, 'fest'); return true;
-    case 'market': { e.did.push(p.id); const st = S.structures.filter(x => x.type === 'stall' && x.done && x.owner !== p.id); if (!st.length || (p.coins || 0) < 1) return false; setAct(p, 'shop', { sid: pick(st).id }); return true; }
+    case 'festival': e.did.push(p.id); setAct(p, 'fest'); prep(p); return true;
+    case 'market': { e.did.push(p.id); const st = S.structures.filter(x => x.type === 'stall' && x.done && x.owner !== p.id); if (!st.length || (p.coins || 0) < 1) return false; setAct(p, 'shop', { sid: pick(st).id }); if (!prep(p)) { p.act = null; return false; } return true; }
     case 'birthday': { e.did.push(p.id); const o = byId(e.data.pid); if (!o || o === p || (p.rel[o.id] || 0) < .4) return false; setAct(p, 'party', { pid: o.id }); return true; }
   }
   return false;
@@ -931,7 +1017,10 @@ function dogStep(dt) {
 
 // ---------- 1歩すすめる ----------
 let planT = 0;
+// 前の版の不具合で座標が壊れた人を、焚き火のそばへ戻す
+function healLost() { for (const p of S.people) if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) { const g = rand(0, 6.283); p.x = Math.cos(g) * 1.6; p.z = Math.sin(g) * 1.6; p.act = null; p.inside = false; } }
 function simStep(dt) {
+  healLost();
   S.time += dt / DAY;
   if (S.time >= 1) { S.time -= 1; S.day++; onNewDay(); }
   runEvent(); checkEra(dt); dogStep(dt);
@@ -956,13 +1045,13 @@ function simStep(dt) {
 }
 function catchUp(sec) {
   if (sec < 5) return [];
-  const from = S.log.length;
+  const mark = S.log[S.log.length - 1];   // 500件で古い記録が消えても、続きを見失わないように
   quiet = true;
   let left = Math.min(sec, DAY * 2);
   while (left > 0) { const s = Math.min(.5, left); simStep(s); left -= s; }
   quiet = false;
   if (S.pending) { populate(S.pending.r0, S.pending.r1); S.pending = null; }
-  return S.log.slice(from);
+  return S.log.slice(S.log.lastIndexOf(mark) + 1);
 }
 
 /* =========================================================
@@ -975,7 +1064,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-const sky = new THREE.Color('#EFE9DF');
+const sky = new THREE.Color('#B4E1F5');
 const FR = 10;
 const camera = new THREE.OrthographicCamera(-FR, FR, FR, -FR, .1, 300);
 const portraitMode = () => innerWidth / innerHeight < 1;
@@ -1267,77 +1356,43 @@ function makeStructure(s) {
 const LAMP = new THREE.MeshLambertMaterial({ color: '#F4E7C8', emissive: '#FFC56E', emissiveIntensity: 0 });
 
 // ---- アバター ----
-const SIZE = { s: 1.35, m: 1.55, l: 1.75 };   // 島の上で読める大きさ（建物よりやや大きめのちびキャラ）
+const SIZE = { s: 1.1, m: 1.1, l: 1.1 };   // 背格好の差は avatar.js で体つきに出す
 function makeAvatar(p) {
-  const L = p.look, has = t => p.seen.includes(t), g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
-  const cm = mat(L.clothes), sm = mat(L.skin);
-  const body = mesh(cyl(.14, .2, .36, 10), cm, false); body.position.y = .18; inner.add(body);
-  const arms = [];
-  for (const sx of [-1, 1]) {
-    const a = new THREE.Group(); a.position.set(sx * .175, .31, 0); a.rotation.z = sx * .12;
-    const m = mesh(cyl(.042, .046, .2, 6), cm, false); m.position.y = -.1; a.add(m);
-    const hand = mesh(sph(.042, 6, 5), sm, false); hand.position.y = -.21; a.add(hand);
-    inner.add(a); arms.push(a);
-  }
-  const headG = new THREE.Group(); inner.add(headG);
-  const head = mesh(sph(.155, 16, 12), sm, false); head.position.y = .5; headG.add(head);
-  const eyeM = mat('#1F1C19'), eyes = [];
-  for (const x of [-.055, .055]) { const e = mesh(sph(.019, 6, 5), eyeM, false); e.position.set(x, .51, .145); headG.add(e); eyes.push(e); }
-  const hm = mat(L.hair);
-  const cap = geo('hcap', () => new THREE.SphereGeometry(.163, 16, 10, 0, Math.PI * 2, 0, Math.PI * .52));
-  if (L.style !== 'bald' && L.style !== 'cap') { const h = mesh(cap, hm, false); h.position.y = .51; h.rotation.x = -.32; headG.add(h); }
-  if (L.style === 'long') { const b = mesh(box(.3, .3, .1), hm, false); b.position.set(0, .42, -.1); headG.add(b); }
-  if (L.style === 'bun') { const b = mesh(sph(.075, 10, 8), hm, false); b.position.set(0, .7, -.07); headG.add(b); }
-  if (L.style === 'cap') {
-    const c = mesh(cyl(.162, .165, .1, 16), hm, false); c.position.y = .62; headG.add(c);
-    const top = mesh(sph(.162, 16, 8), hm, false); top.position.y = .665; top.scale.y = .45; headG.add(top);
-    const brim = mesh(cyl(.13, .13, .018, 14), hm, false); brim.position.set(0, .58, .12); brim.scale.z = .9; headG.add(brim);
-  }
-  if (L.glasses) { const rg = geo('lens', () => new THREE.TorusGeometry(.046, .009, 6, 14)); for (const x of [-.058, .058]) { const r = mesh(rg, eyeM, false); r.position.set(x, .512, .15); headG.add(r); } const br = mesh(box(.03, .01, .01), eyeM, false); br.position.set(0, .515, .155); headG.add(br); }
-  // 見たことが、そのまま持ち物や癖になる
-  if (has('イヤホンで自分の世界にいた')) for (const sx of [-1, 1]) { const e = mesh(sph(.046, 8, 6), mat('#FAF8F3'), false); e.position.set(sx * .155, .5, .02); headG.add(e); const cord = mesh(cyl(.007, .007, .26, 4), mat('#FAF8F3'), false); cord.position.set(sx * .13, .36, .06); cord.rotation.z = sx * .25; inner.add(cord); }
-  if (has('何かを書いたり作ったりしていた')) { const pen = mesh(cyl(.018, .018, .17, 6), mat('#E8B33A'), false); pen.position.set(.16, .58, -.03); pen.rotation.set(0, 0, -.9); headG.add(pen); const tip = mesh(cone(.018, .04, 6), mat('#2B2B2B'), false); tip.position.set(.16 + Math.sin(.9) * .1, .58 - Math.cos(.9) * .1, -.03); tip.rotation.z = -.9 + Math.PI; headG.add(tip); }
-  if (has('身なりがきっちりしていた')) { const tie = mesh(box(.05, .16, .02), mat('#2B2B2B'), false); tie.position.set(0, .24, .178); tie.rotation.x = -.2; inner.add(tie); }
-  if (has('持ち物がごちゃっとしていた')) {
-    const bp = mesh(box(.22, .24, .12), mat('#8B6B4A'), false); bp.position.set(0, .24, -.19); inner.add(bp);
-    const st = mesh(cyl(.012, .012, .24, 4), mat('#C49A6C'), false); st.position.set(.06, .42, -.2); st.rotation.z = .45; inner.add(st);
-    const pa = mesh(box(.09, .11, .015), mat('#F4F0E8'), false); pa.position.set(-.05, .4, -.215); pa.rotation.z = -.3; inner.add(pa);
-  }
-  if (has('荷物を持ってあげていた')) { const tote = mesh(box(.2, .24, .07), mat('#D9CBB0'), false); tote.position.set(0, -.34, .02); arms[1].add(tote); const hd = mesh(geo('handle', () => new THREE.TorusGeometry(.06, .01, 4, 10, Math.PI)), mat('#B8A788'), false); hd.position.set(0, -.22, .02); arms[1].add(hd); }
-  if (has('本や画面に集中していた')) { const bk = mesh(box(.18, .22, .035), mat('#3E5C8A'), false); bk.position.set(0, -.27, .07); bk.rotation.x = -.6; arms[0].add(bk); const pg = mesh(box(.16, .2, .01), mat('#F4F0E8'), false); pg.position.set(0, -.265, .095); pg.rotation.x = -.6; arms[0].add(pg); }
-  if (has('しきりに時計を見ていた')) { const w = mesh(cyl(.066, .066, .03, 10), mat('#2B2B2B'), false); w.position.set(0, -.17, .02); w.rotation.x = Math.PI / 2; arms[0].add(w); const face = mesh(cyl(.05, .05, .01, 10), mat('#F4F0E8'), false); face.position.set(0, -.17, .04); face.rotation.x = Math.PI / 2; arms[0].add(face); }
-  let bird = null;
-  if (has('動物や植物に目を止めていた')) {
-    bird = new THREE.Group();
-    const bb = mesh(sph(.055, 8, 6), mat('#8C949C'), false), beak = mesh(cone(.02, .06, 4), mat('#E39B3B'), false);
-    beak.rotation.x = Math.PI / 2; beak.position.z = .07; bird.add(bb, beak); bird.position.set(.03, .7, 0); bird.visible = false; headG.add(bird);
-  }
-  const carry = mesh(box(.17, .12, .17), mat('#9A6E45'), false); carry.position.y = .82; carry.visible = false; inner.add(carry);
+  const has = t => p.seen.includes(t), g = buildAvatar({ look: p.look, traits: p.traits, seen: p.seen }), u = g.userData;
+  g.traverse(o => { if (o.isMesh) o.castShadow = false; });
   const blob = new THREE.Mesh(geo('blob', () => new THREE.CircleGeometry(.3, 20)), BLOB); blob.rotation.x = -Math.PI / 2; blob.position.y = .02; g.add(blob);
-  const hit = new THREE.Mesh(sph(.42, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = .35; hit.userData.pid = p.id; g.add(hit);
-  g.scale.setScalar(SIZE[L.size] || 1);
-  g.userData = {
-    inner, arms, headG, eyes, bird, carry, hit, ph: rand(0, 60),
-    fast: has('早足で歩いていた'), laugh: has('よく笑っていた'), look: has('キョロキョロ周りを見ていた'), music: has('イヤホンで自分の世界にいた'), watch: has('しきりに時計を見ていた'), book: has('本や画面に集中していた'),
-  };
+  const hit = new THREE.Mesh(sph(.5, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = .5; hit.userData.pid = p.id; g.add(hit);
+  g.scale.setScalar(SIZE[p.look.size] || 1);
+  Object.assign(u, { hit, ph: rand(0, 60), fast: has('早足で歩いていた'), laugh: has('よく笑っていた'), look: has('キョロキョロ周りを見ていた'), music: has('イヤホンで自分の世界にいた'), watch: has('しきりに時計を見ていた'), reads: has('本や画面に集中していた') });
   return g;
 }
-const shotRT = new THREE.WebGLRenderTarget(256, 256);
+const shotRT = new THREE.WebGLRenderTarget(256, 256, { samples: 4 });
 shotRT.texture.colorSpace = THREE.SRGBColorSpace;
 const shotScene = new THREE.Scene(), shotCam = new THREE.PerspectiveCamera(26, 1, .1, 20), shots = new Map();
-shotScene.add(new THREE.HemisphereLight(0xffffff, 0x8a7a66, 1.15));
-{ const l = new THREE.DirectionalLight(0xffffff, 1.5); l.position.set(2, 4, 3); shotScene.add(l); }
-function avatarShot(p) {
-  if (shots.has(p.id)) return shots.get(p.id);
-  const a = makeAvatar(p); a.scale.setScalar(1); a.rotation.y = -.45;
-  shotScene.add(a); shotCam.position.set(0, .66, 1.55); shotCam.lookAt(0, .4, 0);
-  renderer.setRenderTarget(shotRT); renderer.setClearColor(0xEAE3D7, 1); renderer.clear(); renderer.render(shotScene, shotCam);
+shotScene.add(new THREE.HemisphereLight(0xffffff, 0xE6E2CF, 1.9));
+{ const l = new THREE.DirectionalLight(0xFFF4E2, 2.2); l.position.set(1.5, 3, 3); shotScene.add(l); }
+function shoot(a, cy, cz, ty) {
+  shotScene.add(a); shotCam.position.set(0, cy, cz); shotCam.lookAt(0, ty, 0);
+  renderer.setRenderTarget(shotRT); renderer.setClearColor(0xDDEEF3, 1); renderer.clear(); renderer.render(shotScene, shotCam);
   const px = new Uint8Array(256 * 256 * 4); renderer.readRenderTargetPixels(shotRT, 0, 0, 256, 256, px);
   renderer.setRenderTarget(null); renderer.setClearColor(0x000000, 0); shotScene.remove(a);
+  a.traverse(o => { if (o.isMesh && o.geometry.attributes.color) o.geometry.dispose(); });
   const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), img = x.createImageData(256, 256);
   for (let r = 0; r < 256; r++) img.data.set(px.subarray((255 - r) * 1024, (256 - r) * 1024), r * 1024);   // 上下を反転
   x.putImageData(img, 0, 0);
-  const url = c.toDataURL('image/png'); shots.set(p.id, url); return url;
+  return c.toDataURL('image/png');
+}
+function avatarShot(p) {
+  if (shots.has(p.id)) return shots.get(p.id);
+  const a = buildAvatar({ look: p.look, traits: p.traits, seen: p.seen }); applyPose(a.userData, 'pocket'); a.rotation.y = .3;
+  const url = shoot(a, .98, 1.95, .8); shots.set(p.id, url); return url;
+}
+// 髪型の見本。登録中の人の顔で見せる
+const thumbs = new Map();
+function headShot(look, traits) {
+  const k = JSON.stringify([look, traits]);
+  if (!thumbs.has(k)) { if (thumbs.size > 40) thumbs.clear(); const a = buildAvatar({ look, traits }); applyPose(a.userData, 'pocket'); a.rotation.y = .3; thumbs.set(k, shoot(a, .98, 2.0, .86)); }
+  return thumbs.get(k);
 }
 const sceneCam = new THREE.OrthographicCamera(-3.2, 3.2, 2, -2, .1, 300), sceneRT = new THREE.WebGLRenderTarget(480, 300);
 sceneRT.texture.colorSpace = THREE.SRGBColorSpace;
@@ -1391,7 +1446,7 @@ const snow = makeFall(260, '#FFFFFF', 3.2);
 // 雨は短い線で降らせる（点だと雪に見える）
 const rain = (() => {
   const n = 600, g = new THREE.BufferGeometry(), p = new Float32Array(n * 6);
-  for (let i = 0; i < n; i++) { const x = rand(-14, 14), y = rand(0, 12), z = rand(-14, 14); p.set([x, y, z, x - .06, y + .45, z - .06], i * 6); }
+  for (let i = 0; i < n; i++) { const x = rand(-14, 14), y = rand(0, 12), z = rand(-14, 14); const l = rand(.55, 1.05); p.set([x, y, z, x + .16, y + l, z + .1], i * 6); }
   g.setAttribute('position', new THREE.BufferAttribute(p, 3));
   const m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#C9D3DC', transparent: true, opacity: .55, depthWrite: false }));
   m.visible = false; m.frustumCulled = false; scene.add(m); return m;
@@ -1408,15 +1463,18 @@ function burst(x, y, z, n, colHex, speed, life, grav) {
     sparkP.push({ x, y, z, vx: Math.sin(ph) * Math.cos(th) * sp, vy: Math.cos(ph) * sp, vz: Math.sin(ph) * Math.sin(th) * sp, life, max: life, c, grav }); }
   if (sparkP.length > SP_N) sparkP.splice(0, sparkP.length - SP_N);
 }
-function skyTick(dt, tsec) {
+function skyTick(dt, tsec, rawDt) {
   const n = nightness();
   // 雨・雪は、いま見ている範囲のまわりにだけ降らせる
   const storm = evOn('storm');
-  for (const [m, on, v] of [[rain, storm, 9], [snow, SEASON === 'winter', .8]]) {
-    m.visible = on; if (!on) continue;
+  for (const [m, on, v] of [[rain, storm, 15], [snow, SEASON === 'winter', .8]]) {
+    m.visible = !!on; if (!on) continue;
     m.position.set(controls.target.x, 0, controls.target.z);
     const a = m.geometry.attributes.position;
-    if (m === rain) { for (let i = 0; i < a.count; i += 2) { let y = a.getY(i) - v * dt; if (y < 0) y += 12; a.setY(i, y); a.setY(i + 1, y + .45); } }
+    if (m === rain) { for (let i = 0; i < a.count; i += 2) {   // 斜めに速く落として、地面で小さくはねる
+        const l = a.getY(i + 1) - a.getY(i); let y = a.getY(i) - v * rawDt, x = a.getX(i) - v * .18 * rawDt, z = a.getZ(i) - v * .11 * rawDt;
+        if (y < 0) { const wx = x + m.position.x, wz = z + m.position.z; if (i % 12 === 0 && Math.hypot(wx, wz) < walkR()) sparkP.push({ x: wx, y: groundH(wx, wz) + .04, z: wz, vx: 0, vy: 1.1, vz: 0, life: .16, max: .16, c: new THREE.Color('#DCE6EC'), grav: 7 }); y += 12; x = rand(-14, 14); z = rand(-14, 14); }
+        a.setXYZ(i, x, y, z); a.setXYZ(i + 1, x + .16, y + l, z + .1); } }
     else for (let i = 0; i < a.count; i++) { let y = a.getY(i) - v * dt; if (y < 0) y += 12; a.setY(i, y); a.setX(i, a.getX(i) + Math.sin(tsec + i) * dt * .2); }
     a.needsUpdate = true;
   }
@@ -1432,7 +1490,7 @@ function skyTick(dt, tsec) {
 }
 
 // ---- 選択の輪 ----
-const ring = mesh(new THREE.RingGeometry(.34, .42, 40), new THREE.MeshBasicMaterial({ color: '#C8432B', transparent: true, opacity: .9, depthWrite: false }), false);
+const ring = mesh(new THREE.RingGeometry(.34, .42, 40), new THREE.MeshBasicMaterial({ color: '#FFC23C', transparent: true, opacity: .95, depthWrite: false }), false);
 ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
 
 // ---- 同期 ----
@@ -1447,7 +1505,7 @@ function syncList(list, map, make, update) {
   }
   for (const [id, m] of map) if (!seen.has(id)) { scene.remove(m); map.delete(id); }
 }
-function rebuildPerson(p) { shots.delete(p.id); const m = objs.people.get(p.id); if (m) { scene.remove(m); objs.people.delete(p.id); } }
+function rebuildPerson(p) { shots.delete(p.id); const m = objs.people.get(p.id); if (m) { scene.remove(m); objs.people.delete(p.id); m.traverse(o => { if (o.isMesh && o.geometry.attributes.color) o.geometry.dispose(); }); } }
 function rebuildStructuresOf(p) { for (const s of S.structures) if (s.owner === p.id) { const m = objs.structures.get(s.id); if (m) { scene.remove(m); objs.structures.delete(s.id); } } }
 
 const fxList = [];
@@ -1512,32 +1570,35 @@ function syncScene(dt, now) {
     const lying = (a && a.k === 'sleep' && a.ph === 'work' && !p.inside) || (a && a.k === 'nap');
     const talking = a && (a.k === 'chat' || a.k === 'party' && a.ph === 'work' || (a.k === 'talk' && a.ph === 'work'));
     const dancing = a && a.k === 'fest' && a.ph === 'work', gazing = a && a.k === 'look';
-    let hop = 0, sq = 0, lean = 0, armA = 0, headY = 0;
+    let hop = 0, sq = 0, lean = 0, armA = 0, headY = 0, legA = 0, foreA = -.36;
     if (p.moving) {
       // 1歩ごとに小さく跳ね、着地で少しつぶれる
       const f = (6 + p.traits.act * 5) * (u.fast ? 1.4 : 1), sn = Math.sin(T * f);
-      hop = Math.abs(sn) * .09; sq = 1 - Math.min(1, Math.abs(sn) * 4); armA = sn * .7; lean = u.fast ? .14 : .05;
+      hop = Math.abs(sn) * .09; sq = 1 - Math.min(1, Math.abs(sn) * 4); armA = sn * .7; legA = sn * .62; foreA = -.5; lean = u.fast ? .14 : .05;
     } else if (dancing) { hop = Math.abs(Math.sin(T * 7)) * .12; armA = -2.4 + Math.sin(T * 7) * .4; p.dir += dt * 1.6; }
-    else if (working) { const w = Math.max(0, Math.sin(T * 9)); lean = w * .32; armA = -1.1 - w * .9; }
+    else if (working) { const w = Math.max(0, Math.sin(T * 9)); lean = w * .32; armA = -1.1 - w * .9; foreA = -.9; }
     else if (talking) { hop = Math.abs(Math.sin(T * 3)) * .02; armA = Math.sin(T * 2.2) * .35; }
     else if (!lying && !sitting) {
       headY = Math.sin(T * (u.look ? .9 : .35)) * (u.look ? .8 : .35) * smooth(.3, .9, Math.sin(T * .27) * .5 + .5);
       if (u.laugh && Math.sin(T * .5) > .93) hop = Math.abs(Math.sin(T * 12)) * .07;
-      if (u.watch && Math.sin(T * .31) > .9) { armA = -1.4; headY = .5; }
-      if (u.book) { armA = -1.15; headY = 0; }
+      if (u.watch && Math.sin(T * .31) > .9) { armA = -.7; foreA = -1.5; headY = -.34; }
+      if (u.reads) { armA = -.72; foreA = -1.3; headY = 0; }
     }
     m.visible = !p.inside;
     m.rotation.y = lerpAngle(m.rotation.y, p.dir, .2);
-    u.inner.position.y = (sitting ? .24 : 0) + hop + (lying ? .12 : 0);
+    u.inner.position.y = (sitting ? .25 / m.scale.x - u.hip : 0) + hop + (lying ? .25 : 0);
     u.inner.scale.set(1 + sq * .06, 1 - sq * .08, 1 + sq * .06);
     u.inner.rotation.x = lerp(u.inner.rotation.x, lean, .2);
     u.inner.rotation.z = lerp(u.inner.rotation.z, lying ? Math.PI / 2 * .92 : 0, .1);
-    u.arms[0].rotation.x = lerp(u.arms[0].rotation.x, sitting ? -.7 : armA, .3);
-    u.arms[1].rotation.x = lerp(u.arms[1].rotation.x, sitting ? -.7 : working || dancing || (u.book && !p.moving && !talking) ? armA : -armA, .3);
+    u.arms[0].rotation.x = lerp(u.arms[0].rotation.x, sitting ? -.5 : armA, .3);
+    const reading = u.reads && !p.moving && !talking && !working && !lying;
+    u.arms[1].rotation.x = lerp(u.arms[1].rotation.x, sitting ? -.5 : working || dancing || reading ? armA : -armA, .3);
+    for (const i of [0, 1]) { u.fores[i].rotation.x = lerp(u.fores[i].rotation.x, sitting ? -1 : foreA, .3); u.legs[i].rotation.x = lerp(u.legs[i].rotation.x, sitting ? -1.45 : lying ? 0 : (i ? -legA : legA), .35); }
+    u.book.visible = reading;
     u.headG.rotation.y = lerp(u.headG.rotation.y, headY, .1);
     u.headG.rotation.x = lerp(u.headG.rotation.x, gazing ? -.5 : 0, .08);
     const shut = lying || (T % 5) < .09;
-    u.eyes.forEach(e => e.scale.y = shut ? .12 : 1);
+    u.eyes.scale.y = shut ? .1 : 1;
     if (u.bird) { u.bird.visible = !p.moving && !lying && Math.sin(T * .13) > .7; if (u.bird.visible && m.visible) sceneHit('bird', p, `${nm(p)}の頭に小鳥がとまった`); }
     if (u.music && !p.moving && !lying && Math.random() < dt * .06) bubble(p, '🎵');
     u.carry.visible = !!p.carry; if (p.carry) u.carry.material = mat(CARRY[p.carry]);
@@ -1590,10 +1651,10 @@ const KEYS = [
   [0, '#1E2633', '#5F6E8E', '#20262F', .45, '#9FB2D8', .38],
   [.2, '#232C3A', '#66759A', '#232A35', .5, '#A5B7DA', .4],
   [.25, '#E7C7AE', '#F2D9C4', '#8A6E5C', .85, '#FFC9A0', .9],
-  [.33, '#EEE6D9', '#FFF6E8', '#8A7A66', 1.0, '#FFF0D8', 1.35],
-  [.5, '#EDE8DE', '#FFFFFF', '#8A7A66', 1.05, '#FFFFFF', 1.55],
-  [.66, '#EADBC6', '#FFF1DE', '#8A7461', .95, '#FFE1BC', 1.25],
-  [.73, '#E6B892', '#F5CDA8', '#7A5E4E', .8, '#FFAF78', .95],
+  [.33, '#C4E8F6', '#FFF6E8', '#8A7A66', 1.0, '#FFF0D8', 1.35],
+  [.5, '#B4E1F5', '#FFFFFF', '#8A7A66', 1.05, '#FFFFFF', 1.55],
+  [.66, '#CDE6EE', '#FFF1DE', '#8A7461', .95, '#FFE1BC', 1.25],
+  [.73, '#F6C7A3', '#F5CDA8', '#7A5E4E', .8, '#FFAF78', .95],
   [.79, '#4E5B70', '#7C89A6', '#30363F', .6, '#AFBEDB', .42],
   [.86, '#1E2633', '#5F6E8E', '#20262F', .45, '#9FB2D8', .38],
   [1, '#1E2633', '#5F6E8E', '#20262F', .45, '#9FB2D8', .38],
@@ -1644,28 +1705,13 @@ canvas.addEventListener('pointerup', e => {
 /* =========================================================
    画面（UI）
    ========================================================= */
-function portrait(L, size = 64) {
-  const c = L.clothes, h = L.hair, sk = L.skin, st = L.style;
-  const w = { s: .9, m: 1, l: 1.1 }[L.size] || 1;
-  let back = '', front = '';
-  const bodyD = `M${32 - 18 * w} 64 C${32 - 18 * w} ${48} ${32 - 11 * w} 41 32 41 C${32 + 11 * w} 41 ${32 + 18 * w} 48 ${32 + 18 * w} 64 Z`;
-  const fringe = `<path d="M18.3 29 C16.8 9.6 47.2 9.6 45.7 29 C44 22.5 39 19.6 33.5 19.8 C28 19.4 21.6 22.4 18.3 29 Z" fill="${h}"/>`;
-  if (st === 'short') front = fringe;
-  if (st === 'long') { back = `<path d="M18 26 C18 13 46 13 46 26 L47.5 45 C40 48 24 48 16.5 45 Z" fill="${h}"/>`; front = fringe; }
-  if (st === 'bun') front = fringe + `<circle cx="32" cy="12.2" r="5.6" fill="${h}"/>`;
-  if (st === 'cap') front = `<path d="M18.8 23.5 C19.2 10.5 44.8 10.5 45.2 23.5 Z" fill="${h}"/><rect x="15.5" y="21.6" width="33" height="3.6" rx="1.8" fill="${h}"/>`;
-  const eyes = `<circle cx="27.4" cy="29" r="1.55" fill="#1F1C19"/><circle cx="36.6" cy="29" r="1.55" fill="#1F1C19"/>`;
-  const gl = L.glasses ? `<g fill="none" stroke="#1F1C19" stroke-width="1.25"><circle cx="27.4" cy="29" r="3.7"/><circle cx="36.6" cy="29" r="3.7"/><path d="M31.1 29h1.8"/></g>` : '';
-  const cheek = `<circle cx="23.6" cy="33" r="2.1" fill="#E5907E" opacity=".38"/><circle cx="40.4" cy="33" r="2.1" fill="#E5907E" opacity=".38"/>`;
-  return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">${back}<path d="${bodyD}" fill="${c}"/><circle cx="32" cy="27.5" r="13.2" fill="${sk}"/>${front}${eyes}${gl}${cheek}</svg>`;
-}
 function radar(t, size = 128) {
   const cx = size / 2, cy = size / 2 + 3, r = size * .33, pts = (f) => TK.map((k, i) => { const a = -Math.PI / 2 + i / 5 * Math.PI * 2, v = f(k); return [cx + Math.cos(a) * r * v, cy + Math.sin(a) * r * v]; });
   const poly = f => pts(f).map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
   const labels = TK.map((k, i) => { const a = -Math.PI / 2 + i / 5 * Math.PI * 2, x = cx + Math.cos(a) * (r + 17), y = cy + Math.sin(a) * (r + 13) + 3.5; return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="10.5" fill="#5F5951">${TRAITS[k].name}</text>`; }).join('');
   return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true" style="flex:none;overflow:visible">
     ${[1, .66, .33].map(s => `<polygon points="${poly(() => s)}" fill="none" stroke="rgba(31,28,25,.12)"/>`).join('')}
-    <polygon points="${poly(k => .08 + t[k] * .92)}" fill="rgba(200,67,43,.16)" stroke="#C8432B" stroke-width="1.5" stroke-linejoin="round"/>
+    <polygon points="${poly(k => .08 + t[k] * .92)}" fill="rgba(15,124,138,.16)" stroke="#0F7C8A" stroke-width="1.5" stroke-linejoin="round"/>
     ${labels}</svg>`;
 }
 function autoShort(name) {
@@ -1712,25 +1758,25 @@ const ui = {
   closeSheet() { if (this.selected) { zoomTo = fitZoom(); focusOn(0, 0); } this.selected = null; this.follow = false; $('#sheet').classList.remove('on'); },
   renderSheet(full) {
     const p = byId(this.selected); if (!p) return this.closeSheet();
-    if (!full) { const n = $('#nowText'); if (n) n.textContent = actText(p); $$('[data-need]').forEach(e => e.style.width = (p.needs[e.dataset.need] * 100).toFixed(0) + '%'); return; }
+    if (!full) { const n = $('#nowText'); if (n) n.textContent = actText(p); $$('[data-need]').forEach(e => { const k = e.dataset.need, v = k === 'energy' ? p.needs.energy : 1 - p.needs[k]; e.style.width = (v * 100).toFixed(0) + '%'; e.style.background = v < .3 ? 'var(--stamp)' : ''; }); return; }
     const friends = Object.entries(p.rel).map(([id, v]) => [byId(+id), v]).filter(([o]) => o).sort((a, b) => b[1] - a[1]);
     const good = friends.filter(f => f[1] >= .6).slice(0, 4), bad = friends.filter(f => f[1] <= -.6).slice(0, 2);
-    const fchip = ([o, v]) => `<button class="chip friend" data-sel="${o.id}">${portrait(o.look, 20)}${esc(shortName(o))}${v >= 2.2 ? ' · 親友' : ''}</button>`;
+    const fchip = ([o, v]) => `<button class="chip friend" data-sel="${o.id}">${face3d(o, 24)}${esc(shortName(o))}${v >= 2.2 ? ' · 親友' : ''}</button>`;
     const h = homeOf(p);
     $('#sheetBody').innerHTML = `
       <div class="who"><div class="pt">${face3d(p, 66)}</div><div style="min-width:0">
         <div class="no">観察 No.${String(p.no).padStart(3, '0')}</div><h3>${esc(p.name)}</h3>
         <p>${esc(roleOf(p.traits))} · ${esc(p.place || '場所の記録なし')}で観察 · ${p.born}日目に誕生</p></div></div>
       <div class="now"><span class="dot"></span><span id="nowText">${esc(actText(p))}</span></div>
-      ${money() ? `<p class="purse"><b>${p.coins || 0}</b>枚のお金 · ${moneyStyle(p)}${Object.keys(p.debt || {}).length ? ' · 借金あり' : ''}</p>` : ''}
-      <div class="needs"><span>空腹<em><b data-need="hunger" style="width:${p.needs.hunger * 100}%"></b></em></span><span>疲れ<em><b data-need="energy" style="width:${(1 - p.needs.energy) * 100}%"></b></em></span><span>さみしさ<em><b data-need="lonely" style="width:${p.needs.lonely * 100}%"></b></em></span></div>
+      ${money() ? `<p class="purse">${pic('coin', 18)}<b>${p.coins || 0}</b>枚のお金 · ${moneyStyle(p)}${Object.keys(p.debt || {}).length ? ' · 借金あり' : ''}</p>` : ''}
+      <div class="needs"><span>${pic('bounty', 18)}おなか<em><b data-need="hunger" style="width:${(1 - p.needs.hunger) * 100}%"></b></em></span><span>${pic('sun', 18)}げんき<em><b data-need="energy" style="width:${p.needs.energy * 100}%"></b></em></span><span>${pic('bestie', 18)}きもち<em><b data-need="lonely" style="width:${(1 - p.needs.lonely) * 100}%"></b></em></span></div>
       <div class="sec"><h4>この人らしさ</h4><div class="persona">${radar(p.traits, 120)}<p>${esc(personaText(p.traits))}${h ? '<br><small style="font-family:var(--sans);font-size:11px;color:var(--ink2)">' + (p.traits.tidy < .42 ? '丸太小屋' : '白壁の家') + 'に住んでいる</small>' : ''}</p></div></div>
-      ${good.length || bad.length ? `<div class="sec"><h4>人間関係</h4><div class="chips">${good.map(fchip).join('')}${bad.map(([o]) => `<button class="chip friend guess" data-sel="${o.id}">${portrait(o.look, 20)}${esc(shortName(o))} · 気まずい</button>`).join('')}</div></div>` : ''}
+      ${good.length || bad.length ? `<div class="sec"><h4>人間関係</h4><div class="chips">${good.map(fchip).join('')}${bad.map(([o]) => `<button class="chip friend guess" data-sel="${o.id}">${face3d(o, 24)}${esc(shortName(o))} · 気まずい</button>`).join('')}</div></div>` : ''}
       <div class="sec"><h4>あなたが見たこと</h4><div class="chips">${p.seen.length ? p.seen.map(s => `<span class="chip">${esc(s)}</span>`).join('') : '<span class="chip guess">記録なし</span>'}</div></div>
       ${p.guess.length ? `<div class="sec"><h4>あなたの予想</h4><div class="chips">${p.guess.map(s => `<span class="chip guess">きっと${esc(s)}</span>`).join('')}</div></div>` : ''}
       ${p.memo ? `<div class="sec"><h4>メモ</h4><p class="memo">${esc(p.memo)}</p></div>` : ''}
       <div class="sec"><h4>島でしたこと</h4><div class="stats"><div><b>${p.stats.built}</b><small>建てた</small></div><div><b>${p.stats.talked}</b><small>話した</small></div><div><b>${p.stats.carried}</b><small>運んだ</small></div><div><b>${p.stats.found}</b><small>見つけた</small></div></div></div>
-      <div class="acts"><button class="btn ${this.follow ? 'on' : ''}" data-act="follow">${this.follow ? '追いかけるのをやめる' : '追いかける'}</button><button class="btn" data-act="edit">観察を書き足す</button></div>
+      <div class="acts"><button class="btn primary" data-act="edit">観察を書き足す</button><button class="btn" data-act="follow">${this.follow ? '追いかけない' : '追いかける'}</button></div>
       <div class="acts" style="margin-top:8px"><button class="btn" data-act="bench">島から出して待機にする</button>${ROOT.islands.length > 1 ? `<button class="btn" data-act="move">ほかの島へ引っ越す</button>` : ''}</div>
       <div class="acts" style="margin-top:8px"><button class="btn ghost" data-act="farewell" style="margin:0 auto">図鑑から消す</button></div>`;
   },
@@ -1763,30 +1809,33 @@ const ui = {
         : `<button class="slot" data-hint="${esc(n)}|${esc(hint)}"><span class="sil">${SIL}</span><b>？？？</b></button>`; }).join('');
     const where = c => c.island ? (c.island === S ? 'この島' : c.island.name) : '待機中';
     $('#zukanBody').innerHTML = `
-      <div class="typehead"><h4>タイプ</h4><span><b>${filled}</b> / 16</span></div>
-      <div class="slots">${slots}</div>
-      <div class="typehead" style="margin-top:22px"><h4>観察した人</h4><span><b>${cards.length}</b>人</span></div>
+      <div class="typehead"><h4>観察した人</h4><span><b>${cards.length}</b>人</span></div>
       ${cards.length ? `<div class="grid">${cards.map(c => { const p = c.p; return `
       <button class="card ${c.island === S ? '' : 'away'}" data-card="${p.id}"><div class="no">No.${String(p.no).padStart(3, '0')}</div><span class="role">${esc(roleOf(p.traits))}</span>
       <div class="pt">${face3d(p, 84)}</div><div class="nm">${esc(p.name)}</div>
-      <p class="cmemo">${esc(p.memo || (p.seen[0] ? p.seen[0] : '観察メモなし'))}</p>
-      <div class="meta"><span class="where ${c.island === S ? 'here' : ''}">${esc(where(c))}</span>${c.island === S ? '<br>' + esc(actText(p)) : ''}</div></button>`; }).join('')}</div>`
-      : `<div class="empty-note"><b>まだ1人もいません</b>街で見かけた人を、ひとり登録してみてください。<br>ここに観察カードが並んでいきます。</div>`}`;
+      <p class="cmemo">${wb(p.memo || (p.seen[0] ? p.seen[0] : '観察メモなし'))}</p>
+      <div class="meta">${ROOT.islands.length > 1 || c.island !== S ? `<span class="where ${c.island === S ? 'here' : ''}">${esc(where(c))}</span><br>` : ''}${c.island === S ? esc(actText(p)) : ''}</div></button>`; }).join('')}</div>`
+      : `<div class="empty-note"><b>まだ1人もいません</b>街で見かけた人を、ひとり登録してみてください。<br>ここに観察カードが並んでいきます。</div>`}
+      <details class="types"><summary><span>タイプ</span><span><b>${filled}</b> / 16 ›</span></summary><div class="slots">${slots}</div></details>`;
   },
   renderAlbum() {
-    $('#zukanBody').innerHTML = `<p class="qsub" style="margin:0 0 14px">島で一度だけの瞬間が、写真になって残ります。<br>空いている枠には、起こし方のヒントがあります。</p>
-      <div class="album">${SCENES.map(([k, title, hint], i) => { const e = ROOT.album[k];
-        return e ? `<div class="shot"><div class="ph">${safeImg(e.img) ? `<img src="${esc(e.img)}" alt="">` : `<span>留守のあいだの出来事</span>`}</div><div class="cap"><small>No.${String(i + 1).padStart(2, '0')}</small><b>${esc(title)}</b><p>${esc(e.text)}</p><time>${esc(e.island)} · ${+e.day || 0}日目 · ${esc(e.date)}</time></div></div>`
-          : `<div class="shot locked"><div class="ph"><span>？</span></div><div class="cap"><small>No.${String(i + 1).padStart(2, '0')}</small><b>？？？</b><p>ヒント：${esc(hint)}</p></div></div>`; }).join('')}</div>`;
+    const keys = Object.keys(ROOT.album).filter(k => SCENES.some(x => x[0] === k)).reverse();
+    const seal = k => { const [, title] = SCENES.find(x => x[0] === k), i = SCENES.findIndex(x => x[0] === k); return `<button class="seal" data-shot="${k}" style="--r:${(i * 37) % 13 - 6}deg;--a:${PIC_COL[SCENE_PIC[k]]}"><span>${pic(SCENE_PIC[k], 46)}</span><b>${esc(title)}</b></button>`; };
+    const [top, ...rest] = keys, lock = SCENES.filter(x => !ROOT.album[x[0]]);
+    $('#zukanBody').innerHTML = `<div class="tally2"><b>${keys.length}</b><span>/ ${SCENES.length} 個の判子</span></div>
+      ${top ? `<button class="seal big" data-shot="${top}" style="--r:-4deg;--a:${PIC_COL[SCENE_PIC[top]]}"><span>${pic(SCENE_PIC[top], 84)}</span><b>${esc(SCENES.find(x => x[0] === top)[1])}</b><small>いちばん新しい判子</small></button>` : ''}
+      <div class="seals">${rest.map(seal).join('')}${lock.map(([k]) => `<button class="seal off" data-shot="${k}"><span></span></button>`).join('')}</div>`;
   },
   renderDiary() {
     this.logDirty = false;
     $('#diaryCount').textContent = `${S.day}日目`;
     if (!S.log.length) { $('#diaryBody').innerHTML = `<div class="empty-note"><b>まだ何も起きていません</b>島で起きたできごとが、ここに日記として残ります。</div>`; return; }
     const days = {}; for (const e of S.log) (days[e.d] ||= []).push(e);
-    $('#diaryBody').innerHTML = Object.keys(days).sort((a, b) => b - a).slice(0, 40).map(d => `
-      <div class="day"><h3>${d}日目</h3>${days[d].slice().reverse().map(e => { const p = e.pid && byId(e.pid);
-      return `<div class="entry ${e.k === 'level' ? 'level' : ''}"><time>${timeName(e.t)}</time><i style="background:${p ? p.look.clothes : e.k === 'level' ? '#C8432B' : 'transparent'}"></i><span>${esc(fmt(e.text))}</span></div>`; }).join('')}</div>`).join('');
+    $('#diaryBody').innerHTML = Object.keys(days).sort((a, b) => b - a).slice(0, 40).map(d => {
+      const big = days[d].filter(e => ['level', 'event', 'build', 'rel'].includes(e.k)), small = days[d].filter(e => !big.includes(e));
+      const row = e => { const p = e.pid && byId(e.pid); return `<div class="entry">${p ? face3d(p, 26) : '<i></i>'}<span>${wb(fmt(e.text))}</span></div>`; };
+      return `<div class="day"><h3>${d}日目</h3>${big.map(e => { const st = story(e); return `<div class="ev">${pic(st.ic, 40)}<div><b>${esc(st.h)}</b>${st.s ? `<small>${wb(st.s)}</small>` : ''}</div></div>`; }).join('')}
+      ${small.slice(0, 3).map(row).join('')}${small.length > 3 ? `<details class="more"><summary>ほか${small.length - 3}件</summary>${small.slice(3).map(row).join('')}</details>` : ''}</div>`; }).join('');
   },
   structInfo(s) {
     const o = byId(s.owner), t = TYPES[s.type];
@@ -1795,7 +1844,7 @@ const ui = {
     if (s.type === 'house' && (s.lv || 1) > 1) return toast(`${o ? nm(o) + 'の' : ''}${s.lv}階建ての家`);
     toast(s.type === 'house' ? `${o ? nm(o) + 'の家' : '空き家'} · ${s.doneDay}日目に完成` : `${t.name} · 言い出したのは${o ? nm(o) : '今はいない人'} · ${s.doneDay}日目`);
   },
-  levelUp(lv) { stampShow(LEVELS[lv].name, '島が広がった', '島の格'); },
+  levelUp(lv) { stampShow(LEVELS[lv].name, '島が広がった', '島の格', 'level'); },
   menu() {
     modal(`<h3>その他</h3>
       <button class="menu-item" data-m="export"><div>島を書き出す<small>この島をファイルに保存します。機種変更のときに使えます</small></div></button>
@@ -1806,16 +1855,18 @@ const ui = {
   },
 };
 
-function focusOn(x, z) { camTarget = new THREE.Vector3(x, groundH(x, z), z); }
+function focusOn(x, z) { if (!Number.isFinite(x) || !Number.isFinite(z)) return; camTarget = new THREE.Vector3(x, groundH(x, z), z); }
 let camTarget = null, zoomTo = null, viewOff = 0;
 
 // ---------- トースト・判子・モーダル ----------
-let toastT;
-function toast(msg) { const t = $('#toast'); t.textContent = fmt(msg); t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
-let stampUntil = 0;
-function stampShow(big, small, top) {
-  const now = performance.now(); if (now < stampUntil) { setTimeout(() => stampShow(big, small, top), stampUntil - now + 100); return; } stampUntil = now + 2400;
-  const s = $('#stamp'); $('#stampNo').textContent = big; $('#stampName').textContent = small; s.querySelector('small').textContent = top;
+let toastT, stampUntil = 0;
+// 読んでいる画面の上には、判子も名場面の通知も出さない
+const busy = () => ui.tab !== 'island' || ['#form', '#sheet', '#modal'].some(q => $(q).classList.contains('on'));
+function toast(msg, ic) { const w = stampUntil - performance.now(); if (w > 0) { setTimeout(() => toast(msg, ic), w + 80); return; } if (ic && busy()) { setTimeout(() => toast(msg, ic), 1500); return; } const t = $('#toast'); t.classList.toggle('ic', !!ic); t.innerHTML = (ic ? pic(ic, 20) : '') + wb(fmt(msg)); t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+function stampShow(big, small, top, ic) {
+  if (busy()) { setTimeout(() => stampShow(big, small, top, ic), 900); return; }
+  const now = performance.now(); if (now < stampUntil) { setTimeout(() => stampShow(big, small, top, ic), stampUntil - now + 100); return; } stampUntil = now + 2400;
+  const s = $('#stamp'); $('#stampNo').textContent = big; $('#stampName').textContent = small; s.querySelector('small').textContent = top; $('#stampPic').innerHTML = ic ? pic(ic, 44) : '';
   s.classList.remove('go'); void s.offsetWidth; s.classList.add('go');
   navigator.vibrate?.(18);
 }
@@ -1829,6 +1880,7 @@ $('#modal').addEventListener('click', e => {
   if (e.target.id === 'modal') return closeModal();
   const m = e.target.closest('[data-m]')?.dataset.m; if (!m) return;
   if (m === 'close') closeModal();
+  if (m === 'diary') { closeModal(); ui.setTab('diary'); }
   if (m === 'export') {
     const blob = new Blob([JSON.stringify(ROOT)], { type: 'application/json' }), a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `人間観察コレクション_${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -1854,67 +1906,129 @@ $('#importFile').addEventListener('change', async e => {
 // ---------- 観察フォーム ----------
 let F = null, formOpen = false;
 const STEPS = ['どんな人？', '見たこと', 'あなたの予想', 'この人らしさ'];
+const PLACE_IC = { '駅・電車': 'train-front', 'カフェ': 'coffee', '職場': 'briefcase', '学校': 'graduation-cap', '街なか': 'building-2', 'お店': 'store', '公園': 'trees', 'その他': 'ellipsis' };
+// 見たことの絵、改行位置、選んだ時の動きとひとこと
+const SEEN_UI = {
+  'ずっと誰かと話していた': ['messages-square', 'ずっと誰かと|話していた', 'cheer', '誰かと話しこんでいる。'],
+  'ひとりで静かにしていた': ['p-sit', 'ひとりで|静かにしていた', 'stand', 'ひとりで、静かに過ごしている。'],
+  'よく笑っていた': ['smile', 'よく笑っていた', 'cheer', 'なんだか楽しそうに笑っている。'],
+  '早足で歩いていた': ['p-run', '早足で|歩いていた', 'stand', '急ぎ足で、どこかへ向かっている。'],
+  'ゆっくり動いていた': ['p-walk', 'ゆっくり|動いていた', 'stand', 'ゆっくりと、自分のペースで動いている。'],
+  '荷物を持ってあげていた': ['shopping-bag', '荷物を|持ってあげていた', 'stand', 'だれかの荷物を持ってあげている。'],
+  '店員さんに丁寧だった': ['store', '店員さんに|丁寧だった', 'stand', '店員さんに、ていねいにお礼を言っている。'],
+  '身なりがきっちりしていた': ['p-jacket', '身なりが|きっちりしていた', 'stand', '身なりが、きちんと整っている。'],
+  '持ち物がごちゃっとしていた': ['backpack', '持ち物が|ごちゃっとしていた', 'stand', 'かばんの中が、ごちゃっとしている。'],
+  'キョロキョロ周りを見ていた': ['search', 'キョロキョロ|周りを見ていた', 'look', 'キョロキョロと、周りを見ている。'],
+  '本や画面に集中していた': ['book-open', '本や画面に|集中していた', 'read', '本に集中している。'],
+  '何かを書いたり作ったりしていた': ['pencil', '何かを書いたり|作ったりしていた', 'write', '手帳を開いて、何かを考えている。'],
+  '声が大きかった': ['megaphone', '声が|大きかった', 'cheer', '声がよく通る。'],
+  'しきりに時計を見ていた': ['clock', 'しきりに|時計を見ていた', 'watch', 'しきりに、時計を気にしている。'],
+  'イヤホンで自分の世界にいた': ['headphones', 'イヤホンで|自分の世界にいた', 'stand', 'イヤホンで、自分の世界に入っている。'],
+  '動物や植物に目を止めていた': ['sprout', '動物や植物に|目を止めていた', 'look', '小さな生きものに、目を止めている。'],
+};
+const GUESS_UI = {
+  '休みの日は出かける': ['mountain', '休みの日は|出かける'], '休みの日は家でのんびり': ['house', '休みの日は|家でのんびり'], 'まとめ役をしていそう': ['users-round', 'まとめ役を|していそう'], '頼まれると断れない': ['handshake', '頼まれると|断れない'],
+  '計画を立てるのが好き': ['calendar-days', '計画を立てる|のが好き'], '思いつきで動く': ['zap', '思いつきで|動く'], '友だちが多い': ['users', '友だちが多い'], '料理が得意': ['cooking-pot', '料理が得意'], '夜ふかしさん': ['moon-star', '夜ふかしさん'], '早起きさん': ['sunrise', '早起きさん'],
+};
+const TRAIT_UI = {
+  soc: ['users', '話し好きな人は、用がなくても誰かに話しかけに行きます。'], act: ['zap', '元気な人は、誰よりも先に資材を運びに行きます。'], tidy: ['clipboard-check', 'きっちりした人は、小道や街灯を作りたがります。'],
+  cur: ['search', '寄り道好きな人は、島のはしまで探検に出かけます。'], kind: ['heart', '世話焼きな人は、お腹をすかせた人に食べ物を届けます。'],
+};
+const NBSP = s => s.split('|').map(esc).join('<br>');
+const cv = document.createElement('canvas'); cv.id = 'fStage'; cv.setAttribute('aria-label', '左右にドラッグすると回ります');
+let stage = null, stageDirty = false, hintTrait = 'soc';
+const nearest1 = (c, list) => { const v = new THREE.Color(c); let b = list[0], bd = 9; for (const h of list) { const q = new THREE.Color(h), d = Math.abs(q.r - v.r) + Math.abs(q.g - v.g) + Math.abs(q.b - v.b); if (d < bd) { bd = d; b = h; } } return b; };
+const liveTraits = f => f.touched && f.traits ? f.traits : traitsFrom(f.seen, f.guess);
 function openForm(editId) {
   const p = editId && byId(editId);
-  F = p ? { editId, step: 0, name: p.name, short: p.short || '', place: p.place, look: { ...p.look }, seen: [...p.seen], guess: [...p.guess], memo: p.memo || '', traits: { ...p.traits }, touched: true }
-    : { step: 0, name: '', short: '', place: '', look: { clothes: pick(LOOK.clothes), hair: LOOK.hair[0], skin: pick(LOOK.skin), style: 'short', size: 'm', glasses: false }, seen: [], guess: [], memo: '', traits: null, touched: false };
+  F = p ? { editId, step: 0, name: p.name, short: p.short || '', place: p.place, look: { ...p.look, clothes: nearest1(p.look.clothes, LOOK.clothes), hair: nearest1(p.look.hair, LOOK.hair), skin: nearest1(p.look.skin, LOOK.skin) }, seen: [...p.seen], guess: [...p.guess], memo: p.memo || '', traits: { ...p.traits }, touched: true, last: null }
+    : { step: 0, name: '', short: '', place: '', look: { clothes: pick(LOOK.clothes), hair: LOOK.hair[0], skin: pick(LOOK.skin), style: 'short', size: 'm', glasses: false }, seen: [], guess: [], memo: '', traits: null, touched: false, last: null };
   formOpen = true; ui.updateWelcome();
-  $('#form').classList.add('on'); renderForm();
+  $('#form').classList.add('on');
+  if (!stage) { stage = createStage(cv); $('#formLogo').src = stage.isleShot(); }
+  renderForm(); stage.spinTo(0); stageDirty = true; flushStage(); stage.start();
 }
-function closeForm() { formOpen = false; $('#form').classList.remove('on'); ui.updateWelcome(); document.activeElement?.blur?.(); }
+function closeForm() { formOpen = false; stage?.stop(); $('#form').classList.remove('on'); ui.updateWelcome(); document.activeElement?.blur?.(); }
+function flushStage() { if (!stageDirty || !F) return; stageDirty = false; stage.setPerson(F.look, liveTraits(F), F.seen); }
+function markStage() { if (stageDirty) return; stageDirty = true; requestAnimationFrame(flushStage); }
+// 選んだ見たことに合わせて、キャラの動きとひとことが変わる
+function reactKey(f) { const k = f.last && f.seen.includes(f.last) ? f.last : f.seen[f.seen.length - 1]; return k ? SEEN_UI[k] : null; }
+function formPose(f) {
+  const hasNote = f.seen.includes('何かを書いたり作ったりしていた') || f.seen.includes('本や画面に集中していた');
+  if (f.step === 0) return ['pocket', false];
+  if (f.step === 1) { const r = reactKey(f); return [r ? r[2] : 'stand', hasNote]; }
+  return ['think', hasNote];
+}
+function applyFormPose() { const [p, b] = formPose(F); stage.setPose(p, b); }
 function renderForm() {
-  const f = F, b = $('#formBody');
-  $('#formStepLabel').textContent = `${f.step + 1} / 4 · ${STEPS[f.step]}`;
-  $$('#formProg i').forEach((i, k) => i.classList.toggle('on', k <= f.step));
-  $('#formBack').textContent = '戻る'; $('#formBack').style.visibility = f.step ? '' : 'hidden';
-  $('#formNext').textContent = f.step === 3 ? (f.editId ? 'この内容で書き直す' : '島に送り出す') : '次へ';
-  $('#formNext').className = 'btn ' + (f.step === 3 ? 'red' : 'primary');
-  const opts = (list, sel, attr, cls = '') => list.map(v => `<button class="opt ${cls} ${sel.includes(v) ? 'on' : ''}" data-${attr}="${esc(v)}">${esc(v)}</button>`).join('');
+  const f = F, b = $('#formBody'), L = f.look, name = f.short.trim() || (f.name.trim() ? shortName({ name: f.name.trim() }) : '名前のない人');
+  $$('#formSteps li').forEach((li, k) => { li.classList.toggle('done', k < f.step); li.classList.toggle('on', k === f.step); });
+  $('#formBack').innerHTML = `${ic('arrow-left', 20, 2.4)}戻る`;
+  $('#formNext').className = 'cta' + (f.step === 3 ? ' send' : '');
+  $('#formNext').innerHTML = f.step === 3 ? `${ic('send', 24, 2.2)}<b>${f.editId ? 'この内容で書き直す' : '島に送り出す'}</b>` : `<b>次へ</b><span>${STEPS[f.step + 1]}</span>${ic('arrow-right', 22, 2.4)}`;
+  const pill = `<p class="spill">${f.step + 1} / 4<span>${STEPS[f.step]}</span></p>`;
+  const checks = (list, ui, sel, attr) => list.map(v => { const u = ui[v], on = sel.includes(v); return `<button class="pick ${on ? 'on' : ''}" data-${attr}="${esc(v)}">${ic(u[0], 30, 1.9)}<span>${NBSP(u[1])}</span><i>${on ? ic('check', 18, 3.2) : ''}</i></button>`; }).join('');
+  const count = n => `<p class="cnt"><b>${n}つ</b>選択中</p>`;
   if (f.step === 0) {
-    const L = f.look;
-    b.innerHTML = `<p class="q">どんな人でしたか？</p><p class="qsub">見たままでかまいません。本名はいりません。</p>
-      <div class="preview"><div class="pt" id="pv">${portrait(L, 104)}</div></div>
-      <div class="field"><label>あだ名</label><input class="tinput" id="fName" maxlength="28" placeholder="例：駅のホームで文庫本を読んでいた人" value="${esc(f.name)}" autocomplete="off"></div>
-      <div class="field"><label>島での呼び名（なくても大丈夫）</label><input class="tinput" id="fShort" maxlength="7" placeholder="例：手帳の人" value="${esc(f.short)}" autocomplete="off"><p class="note">島で頭の下に出る、短い名前です。</p></div>
-      <div class="field"><label>見かけた場所</label><div class="opts">${opts(PLACES, [f.place], 'place')}</div></div>
-      <div class="field"><label>服の色</label><div class="sw">${LOOK.clothes.map(c => `<button data-look="clothes" data-v="${c}" class="${L.clothes === c ? 'on' : ''}" style="background:${c}" aria-label="服の色"></button>`).join('')}</div></div>
-      <div class="field"><label>髪</label><div class="opts">${LOOK.styles.map(([k, n]) => `<button class="opt ${L.style === k ? 'on' : ''}" data-look="style" data-v="${k}">${n}</button>`).join('')}</div>
-        <div class="sw" style="margin-top:12px">${LOOK.hair.map(c => `<button data-look="hair" data-v="${c}" class="${L.hair === c ? 'on' : ''}" style="background:${c}" aria-label="髪の色"></button>`).join('')}</div></div>
-      <div class="field"><label>肌</label><div class="sw">${LOOK.skin.map(c => `<button data-look="skin" data-v="${c}" class="${L.skin === c ? 'on' : ''}" style="background:${c}" aria-label="肌の色"></button>`).join('')}</div></div>
-      <div class="field"><label>背格好</label><div class="opts">${LOOK.sizes.map(([k, n]) => `<button class="opt ${L.size === k ? 'on' : ''}" data-look="size" data-v="${k}">${n}</button>`).join('')}</div></div>
-      <div class="field"><label>身につけていたもの</label><div class="opts"><button class="opt ${L.glasses ? 'on' : ''}" data-look="glasses" data-v="1">メガネ</button></div></div>`;
-    $('#fName').addEventListener('input', e => { f.name = e.target.value; e.target.classList.remove('err'); });
-    $('#fShort').addEventListener('input', e => { f.short = e.target.value; });
+    const row = (t, html) => `<div class="lrow"><h4>${t}</h4><div>${html}</div></div>`;
+    const dots = (k, list, big) => `<div class="dots ${big ? 'big' : ''}">${list.map(c => `<button data-look="${k}" data-v="${c}" class="${L[k] === c ? 'on' : ''}" style="--c:${c}" aria-label="${c}">${L[k] === c ? `<i>${ic('check', 12, 3.6)}</i>` : ''}</button>`).join('')}</div>`;
+    b.innerHTML = `<div class="hero" id="hero">
+        <div class="htext">${pill}<h2 class="q">どんな人でしたか？</h2><p class="qsub">見たままでかまいません。本名はいりません。</p>
+        <label class="fcard">${ic('pencil', 20)}<b>あだ名</b><em id="cName">${f.name.length}/28</em><input class="tinput" id="fName" maxlength="28" placeholder="例：駅で文庫本を読んでいた人" value="${esc(f.name)}" autocomplete="off"></label>
+        <label class="fcard">${ic('pencil', 20)}<b>島での呼び名<small> · 任意</small></b><em id="cShort">${f.short.length}/7</em><input class="tinput" id="fShort" maxlength="7" placeholder="例：手帳の人" value="${esc(f.short)}" autocomplete="off"></label></div>
+        <p class="turnhint">${ic('rotate-3d', 16)}ドラッグで回せます</p></div>
+      <section class="card"><h3>${ic('map-pin', 22)}見かけた場所</h3><div class="places">${PLACES.map(v => `<button class="chip2 ${f.place === v ? 'on' : ''}" data-place="${esc(v)}">${ic(PLACE_IC[v], 20)}<span>${esc(v)}</span>${f.place === v ? ic('check', 16, 3) : ''}</button>`).join('')}</div></section>
+      <section class="card"><h3>${ic('p-hanger', 22)}見た目の特徴</h3>
+        ${row('髪型', `<div class="hairs">${LOOK.styles.map(([k, n]) => `<button class="hair ${L.style === k ? 'on' : ''}" data-look="style" data-v="${k}"><span><img data-thumb="${k}" alt=""></span><b>${n}</b>${L.style === k ? `<i>${ic('check', 12, 3.6)}</i>` : ''}</button>`).join('')}</div>`)}
+        ${row('髪の色', dots('hair', LOOK.hair, true))}${row('肌の色', dots('skin', LOOK.skin, true))}${row('服の色', dots('clothes', LOOK.clothes))}
+        ${row('背格好', `<div class="sizes">${LOOK.sizes.map(([k, n], i) => `<button class="chip2 ${L.size === k ? 'on' : ''}" data-look="size" data-v="${k}">${ic('p-body', 14 + i * 4)}<span>${n}</span>${L.size === k ? ic('check', 16, 3) : ''}</button>`).join('')}</div>`)}</section>
+      <section class="card"><h3>${ic('glasses', 22)}身につけていたもの</h3><div class="wear"><button class="chip2 ${L.glasses ? 'on' : ''}" data-look="glasses" data-v="1">${ic('glasses', 20)}<span>メガネ</span>${L.glasses ? ic('check', 16, 3) : ''}</button></div></section>`;
+    $('#fName').addEventListener('input', e => { f.name = e.target.value; e.target.classList.remove('err'); stage.nod(); $('#cName').textContent = `${f.name.length}/28`; });
+    $('#fShort').addEventListener('input', e => { f.short = e.target.value; stage.nod(); $('#cShort').textContent = `${f.short.length}/7`; });
+    const tr = liveTraits(f); $$('[data-thumb]').forEach(im => im.src = headShot({ ...L, style: im.dataset.thumb }, tr));
   }
   if (f.step === 1) {
-    b.innerHTML = `<p class="q">その人は、何をしていましたか？</p><p class="qsub">見たことを選んでください。いくつでも。<br>選んだことが、その人の性格のもとになります。</p>
-      <div class="opts">${opts(SEEN.map(s => s[0]), f.seen, 'seen')}</div>`;
+    const r = reactKey(f);
+    b.innerHTML = `<div class="hero" id="hero"><div class="htext">${pill}<h2 class="q">その人は、<br>何をしていましたか？</h2><p class="qsub">見たことを、いくつでも。選ばずに進んでも大丈夫。</p>
+        <div class="namecard">${ic('pencil', 22)}<b>${esc(name)}</b><p id="fLine">${r ? r[3] : '選ぶと、この人の動きが変わります。'}</p></div></div></div>
+      <section class="card picks"><div class="grid2">${checks(SEEN.map(s => s[0]), SEEN_UI, f.seen, 'seen')}</div><div id="fCount">${count(f.seen.length)}</div></section>`;
   }
   if (f.step === 2) {
-    b.innerHTML = `<p class="q">きっと、こんな人。</p><p class="qsub">ここからはあなたの想像です。当たっているかは誰にもわかりません。</p>
-      <div class="opts">${opts(GUESS.map(s => s[0]), f.guess, 'guess', 'guessopt')}</div>
-      <div class="field" style="margin-top:22px"><label>ひとことメモ</label><textarea class="tinput" id="fMemo" maxlength="140" placeholder="例：電話の相手にだけ敬語じゃなかった。たぶん家族。">${esc(f.memo)}</textarea></div>`;
-    $('#fMemo').addEventListener('input', e => f.memo = e.target.value);
+    b.innerHTML = `<div class="hero" id="hero"><div class="htext">${pill}<h2 class="q">きっと、こんな人。</h2><p class="qsub">ここからは、あなたの想像です。<br>選ばずに進んでも大丈夫。</p>
+        <div class="namecard one">${ic('pencil', 22)}<b>${esc(name)}</b></div></div></div>
+      <section class="card picks"><div class="grid2">${checks(GUESS.map(s => s[0]), GUESS_UI, f.guess, 'guess')}</div>
+        <p class="tip">夜ふかし・早起きは、島での睡眠時間にも反映されます。</p>
+        <label class="memo2"><b>${ic('pencil', 20)}ひとことメモ<small> · 任意</small></b><textarea class="tinput" id="fMemo" maxlength="140" placeholder="例：コーヒーを2口で飲み切っていた。">${esc(f.memo)}</textarea><em id="cMemo">${f.memo.length} / 140</em></label>
+        <div id="fCount">${count(f.guess.length)}</div></section>`;
+    $('#fMemo').addEventListener('input', e => { f.memo = e.target.value; $('#cMemo').textContent = `${f.memo.length} / 140`; });
   }
   if (f.step === 3) {
     if (!f.touched) f.traits = traitsFrom(f.seen, f.guess);
-    b.innerHTML = `<p class="q">この人らしさ</p><p class="qsub">あなたの観察から読み取った性格です。違うと思ったら、動かしてください。</p>
-      <div class="readout">${portrait(f.look, 64)}<p id="fPersona">${esc(personaText(f.traits))}<small id="fRole">島での役まわり：${esc(roleOf(f.traits))}</small></p></div>
-      ${TK.map(k => `<div class="slider"><div class="top"><b>${TRAITS[k].name}</b><span id="sv-${k}">${valWord(k, f.traits[k])}</span></div>
-        <input type="range" min="5" max="95" value="${Math.round(f.traits[k] * 100)}" data-trait="${k}" style="--v:${(f.traits[k] * 100 - 5) / .9}%">
-        <div class="ends"><span>${TRAITS[k].lo}</span><span>${TRAITS[k].hi}</span></div></div>`).join('')}
-      <p class="note">島での動き方は、この5つの数字だけで決まります。たとえば話し好きな人は、用がなくても誰かに話しかけに行きます。</p>`;
+    const early = f.guess.find(g => g === '早起きさん' || g === '夜ふかしさん');
+    b.innerHTML = `<div class="hero short" id="hero"><div class="htext">${pill}<h2 class="q">この人らしさ</h2><p class="qsub">観察と予想から生まれた性格です。<br>違うと思ったら、調整できます。</p>
+        <div class="namecard wide">${ic('pencil', 22)}<b>${esc(name)}</b>${f.place ? `<small>${esc(f.place)}で見かけた人</small>` : ''}<p id="fPersona">${esc(personaText(f.traits))}</p><div class="rolebar">${ic('briefcase', 18)}島での役まわり：<b id="fRole">${esc(roleOf(f.traits))}</b></div></div></div></div>
+      <section class="card"><h3>${ic('sliders-horizontal', 22)}性格を調整する</h3>
+      ${TK.map(k => `<div class="slider2">${ic(TRAIT_UI[k][0], 26, 1.9)}<b>${TRAITS[k].name}</b><div><input type="range" min="5" max="95" value="${Math.round(f.traits[k] * 100)}" data-trait="${k}" style="--v:${(f.traits[k] * 100 - 5) / .9}%" aria-label="${TRAITS[k].name}"><p><span>${TRAITS[k].lo}</span><span>${TRAITS[k].hi}</span></p></div></div>`).join('')}
+      <p class="tip" id="fHint">${esc(TRAIT_UI[hintTrait][1])}</p></section>
+      <div class="sums"><span>${ic('binoculars', 18)}見たこと <b>${f.seen.length}つ</b></span><span>${ic('lightbulb', 18)}予想 <b>${f.guess.length}つ</b></span>${early ? `<span class="on">${ic(early === '早起きさん' ? 'sunrise' : 'moon-star', 18)}${early}</span>` : ''}</div>
+      <div class="dest"><img src="${$('#formLogo').src}" alt=""><span>送り先</span><b>${esc(S.name)}</b></div>`;
   }
+  $('#hero').prepend(cv); stage && (stage.resize(), applyFormPose());
   b.scrollTop = 0;
 }
-function valWord(k, v) { return v > .72 ? `かなり${TRAITS[k].hi}` : v > .56 ? `やや${TRAITS[k].hi}` : v < .28 ? `かなり${TRAITS[k].lo}` : v < .44 ? `やや${TRAITS[k].lo}` : 'ふつう'; }
 $('#formBody').addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t || !F) return;
   const f = F, d = t.dataset;
   if (d.place) { f.place = f.place === d.place ? '' : d.place; renderFormKeep(); }
-  if (d.look) { if (d.look === 'glasses') f.look.glasses = !f.look.glasses; else f.look[d.look] = d.v; renderFormKeep(); }
-  if (d.seen) { toggle(f.seen, d.seen); t.classList.toggle('on'); f.touched = false; }
-  if (d.guess) { toggle(f.guess, d.guess); t.classList.toggle('on'); f.touched = false; }
+  if (d.look) { if (d.look === 'glasses') f.look.glasses = !f.look.glasses; else f.look[d.look] = d.v; renderFormKeep(); markStage(); stage.hop(); }
+  if (d.seen || d.guess) {
+    const list = d.seen ? f.seen : f.guess, v = d.seen || d.guess; toggle(list, v); const on = list.includes(v);
+    t.classList.toggle('on', on); t.querySelector('i').innerHTML = on ? ic('check', 18, 3.2) : '';
+    $('#fCount').innerHTML = `<p class="cnt"><b>${list.length}つ</b>選択中</p>`;
+    f.touched = false;
+    if (d.seen) { f.last = on ? v : null; const r = reactKey(f); $('#fLine').textContent = r ? r[3] : '選ぶと、この人の動きが変わります。'; applyFormPose(); }
+    markStage(); if (on) stage.hop();
+  }
 });
 function renderFormKeep() { const y = $('#formBody').scrollTop; renderForm(); $('#formBody').scrollTop = y; }
 const toggle = (arr, v) => { const i = arr.indexOf(v); i < 0 ? arr.push(v) : arr.splice(i, 1); };
@@ -1922,11 +2036,11 @@ $('#formBody').addEventListener('input', e => {
   const k = e.target.dataset.trait; if (!k) return;
   F.traits[k] = +e.target.value / 100; F.touched = true;
   e.target.style.setProperty('--v', `${(+e.target.value - 5) / .9}%`);
-  $(`#sv-${k}`).textContent = valWord(k, F.traits[k]);
-  $('#fPersona').firstChild.textContent = personaText(F.traits);
-  $('#fRole').textContent = `島での役まわり：${roleOf(F.traits)}`;
+  hintTrait = k; $('#fHint').textContent = TRAIT_UI[k][1];
+  $('#fPersona').textContent = personaText(F.traits);
+  $('#fRole').textContent = roleOf(F.traits);
+  markStage();   // 顔は性格で決まるので、動かすとその場で変わる
 });
-$('#formClose').onclick = closeForm;
 $('#formBack').onclick = () => { if (!F.step) return closeForm(); F.step--; renderForm(); };
 $('#formNext').onclick = () => {
   const f = F;
@@ -1949,9 +2063,9 @@ $('#formNext').onclick = () => {
 
 // ---------- 見本の3人 ----------
 const SAMPLES = [
-  { name: '朝のカフェで手帳を広げていた人', short: '手帳の人', place: 'カフェ', look: { clothes: '#3E5C8A', hair: '#2A2523', skin: '#E6BC98', style: 'short', size: 'm', glasses: true }, seen: ['身なりがきっちりしていた', '何かを書いたり作ったりしていた', 'しきりに時計を見ていた'], guess: ['計画を立てるのが好き', '早起きさん'], memo: 'コーヒーを2口で飲み切っていた。' },
-  { name: '公園で鳩に話しかけていた人', short: '鳩の人', place: '公園', look: { clothes: '#E39B3B', hair: '#D9D6D0', skin: '#F2D5BC', style: 'cap', size: 's', glasses: false }, seen: ['よく笑っていた', '動物や植物に目を止めていた', 'ゆっくり動いていた', '本や画面に集中していた'], guess: ['休みの日は出かける', '頼まれると断れない'], memo: '鳩にも「おはよう」と言っていた。' },
-  { name: '駅で道を聞かれていた背の高い人', short: '道案内の人', place: '駅・電車', look: { clothes: '#6F9E5B', hair: '#5A3E2B', skin: '#C99670', style: 'long', size: 'l', glasses: false }, seen: ['ずっと誰かと話していた', '荷物を持ってあげていた', '声が大きかった', 'イヤホンで自分の世界にいた'], guess: ['友だちが多い', '思いつきで動く'], memo: '' },
+  { name: '朝のカフェで手帳を広げていた人', short: '手帳の人', place: 'カフェ', look: { clothes: '#2C3E5A', hair: '#2A2826', skin: '#F2C9A0', style: 'short', size: 'm', glasses: true }, seen: ['身なりがきっちりしていた', '何かを書いたり作ったりしていた', 'しきりに時計を見ていた'], guess: ['計画を立てるのが好き', '早起きさん'], memo: 'コーヒーを2口で飲み切っていた。' },
+  { name: '公園で鳩に話しかけていた人', short: '鳩の人', place: '公園', look: { clothes: '#CC6B33', hair: '#A9A6A0', skin: '#F8DCC4', style: 'cap', size: 's', glasses: false }, seen: ['よく笑っていた', '動物や植物に目を止めていた', 'ゆっくり動いていた', '本や画面に集中していた'], guess: ['休みの日は出かける', '頼まれると断れない'], memo: '鳩にも「おはよう」と言っていた。' },
+  { name: '駅で道を聞かれていた背の高い人', short: '道案内の人', place: '駅・電車', look: { clothes: '#76884F', hair: '#5A3F2E', skin: '#DDA56C', style: 'long', size: 'l', glasses: false }, seen: ['ずっと誰かと話していた', '荷物を持ってあげていた', '声が大きかった', 'イヤホンで自分の世界にいた'], guess: ['友だちが多い', '思いつきで動く'], memo: '' },
 ];
 function addSamples() {
   SAMPLES.forEach((s, i) => setTimeout(() => {
@@ -1967,6 +2081,9 @@ $('#tabbar').addEventListener('click', e => { const t = e.target.closest('[data-
 $('#addBtn').onclick = () => openForm();
 $('#welcome').addEventListener('click', e => { const a = e.target.closest('[data-act]')?.dataset.act; if (a === 'add') openForm(); if (a === 'sample') { if (e.target.closest('[data-act]').dataset.mode === 'pick') { ui.zview = 'people'; ui.setTab('zukan'); toast('住まわせたい人のカードを押してください'); } else addSamples(); } });
 document.addEventListener('click', e => {
+  const sh = e.target.closest('[data-shot]'); if (sh) { const k = sh.dataset.shot, d = SCENES.find(x => x[0] === k), a = ROOT.album[k];
+    if (!a) return modal(`<h3>まだ押されていない判子</h3><p>${wb('ヒント：' + d[2])}</p><div class="acts"><button class="btn" data-m="close">閉じる</button></div>`);
+    return modal(`<div class="seald">${safeImg(a.img) ? `<img src="${esc(a.img)}" alt="">` : pic(SCENE_PIC[k], 84)}<h3>${esc(d[1])}</h3><p>${wb(a.text)}</p><small>${esc(a.island)} · ${+a.day || 0}日目</small></div><div class="acts"><button class="btn primary" data-m="close">閉じる</button></div>`); }
   const zv = e.target.closest('[data-zv]'); if (zv) { ui.zview = zv.dataset.zv; ui.renderZukan(); $('#zukanBody').scrollTop = 0; return; }
   const hn = e.target.closest('[data-hint]'); if (hn) { const [n, h] = hn.dataset.hint.split('|'); toast(`まだ出会っていないタイプ。${h}を探してみてください`); return; }
   const cd = e.target.closest('[data-card]'); if (cd) { cardMenu(+cd.dataset.card); return; }
@@ -2026,7 +2143,7 @@ function cardMenu(id) {
 function islandMenu() {
   const n = ROOT.islands.length;
   modal(`<h3>島をえらぶ</h3><p>島は${MAX_ISLANDS}つまで持てます。住人は図鑑から選んで住まわせられます（1人が住めるのは1つの島だけ）。</p>
-    <div class="isls">${ROOT.islands.map(i => `<button class="isl ${i === S ? 'on' : ''}" data-isl="${i.id}"><div><b>${esc(i.name)}</b><small>${LEVELS[i.level].name} · ${i.people.length}人 · ${i.day}日目</small></div><span class="faces">${i.people.slice(0, 5).map(p => portrait(p.look, 26)).join('')}</span></button>`).join('')}
+    <div class="isls">${ROOT.islands.map(i => `<button class="isl ${i === S ? 'on' : ''}" data-isl="${i.id}"><div><b>${esc(i.name)}</b><small>${LEVELS[i.level].name} · ${i.people.length}人 · ${i.day}日目</small></div><span class="faces">${i.people.slice(0, 5).map(p => face3d(p, 26)).join('')}</span></button>`).join('')}
     ${n < MAX_ISLANDS ? `<button class="isl new" id="newIsl"><div><b>＋ 新しい島をつくる</b><small>あと${MAX_ISLANDS - n}つ持てます</small></div></button>` : ''}</div>
     <div class="acts"><button class="btn" id="renIsl">名前を変える</button>${n > 1 ? `<button class="btn" id="delIsl">この島をなくす</button>` : ''}<button class="btn primary" data-m="close">閉じる</button></div>`);
   $$('[data-isl]').forEach(b => b.onclick = () => { closeModal(); if (+b.dataset.isl !== S.id) switchIsland(+b.dataset.isl); });
@@ -2060,22 +2177,27 @@ function switchIsland(id, fresh) {
   toast(fresh ? `${S.name}ができました。図鑑から住人を選んでください` : `${S.name}に来ました`);
   if (away.length) setTimeout(() => showAway(away), 700);
 }
-// 留守のあいだの出来事は、見出し3本の「島の新聞」1枚にまとめる
+// 留守のあいだの出来事は「島の新聞」1枚にまとめる。絵と見出しだけで5秒で分かる形にする
 function showAway(entries) {
   const list = entries.filter(e => e.k !== 'born'); if (!list.length) return;
-  const pri = e => e.k === 'level' ? 5 : e.k === 'event' ? 4 : e.k === 'build' ? 3 : e.k === 'rel' ? 2 : 1;
-  const top = list.map((e, i) => [e, i]).sort((a, b) => pri(b[0]) - pri(a[0]) || b[1] - a[1]).slice(0, 3).map(x => x[0]);
-  const rich = money() ? S.people.slice().sort((a, b) => (b.coins || 0) - (a.coins || 0))[0] : null;
-  const notes = [list.length > 3 ? `ほかに${list.length - 3}つの出来事` : '', rich && rich.coins ? `いちばんのお金持ちは${esc(shortName(rich))}（${rich.coins}枚）` : '', `${ERAS[S.era || 0].name} · ${SEASON_NAME[SEASON]}`].filter(Boolean).join('　');
-  modal(`<div class="news"><div class="mast"><small>${esc(S.name)}</small><b>島の新聞</b><span>${S.day}日目</span></div>
-    <h3 class="lead">${esc(fmt(top[0].text))}</h3>${top.slice(1).map(e => `<p class="sub">${esc(fmt(e.text))}</p>`).join('')}
-    <p class="notes">${notes}</p></div><div class="acts"><button class="btn primary" data-m="close">島を見る</button></div>`);
+  const pri = e => /の時代」に入った/.test(e.text) ? 6 : e.k === 'level' ? 5 : e.k === 'event' ? 4 : e.k === 'build' ? 3 : e.k === 'rel' ? 2 : 1;
+  const seen = new Set(), top = [];
+  for (const [e] of list.map((e, i) => [e, i]).sort((a, b) => pri(b[0]) - pri(a[0]) || b[1] - a[1])) {
+    const st = story(e); if (seen.has(st.ic)) continue;
+    seen.add(st.ic); top.push({ ...st, who: e.pid && byId(e.pid) }); if (top.length === 3) break;
+  }
+  const [lead, ...rest] = top;
+  modal(`<div class="news"><div class="mast"><b>島の新聞</b><span>${esc(S.name)} · ${S.day}日目</span></div>
+    <div class="hero t-${lead.tone}"><div class="art">${pic(lead.ic, 76)}${lead.who ? `<div class="hface">${face3d(lead.who, 52)}</div>` : ''}</div></div>
+    <h3 class="lead">${esc(lead.h)}</h3>${lead.s ? `<p class="deck">${wb(lead.s)}</p>` : ''}
+    ${rest.length ? `<ul class="rows">${rest.map(r => `<li>${pic(r.ic, 32)}<div><b>${esc(r.h)}</b>${r.s ? `<small>${wb(r.s)}</small>` : ''}</div></li>`).join('')}</ul>` : ''}
+    </div><div class="acts"><button class="btn" data-m="diary">${pic('note', 18)}日記で読む ${list.length}件</button><button class="btn primary" data-m="close">島を見る</button></div>`);
 }
 
 // ---------- ループ ----------
 let last = performance.now(), hudT = 0, saveT = 0;
 function frame(now) {
-  const rdt = Math.min(.05, (now - last) / 1000); last = now;
+  const realDt = Math.min(.2, (now - last) / 1000), rdt = Math.min(.05, realDt); last = now;
   const mul = SPEEDS[ui.speedIdx][0];
   if (mul) { let g = rdt * mul; while (g > 0) { const s = Math.min(g, .25); simStep(s); g -= s; } }
   // 島が広がる
@@ -2083,7 +2205,7 @@ function frame(now) {
     view.R += (S.R - view.R) * Math.min(1, rdt * 1.6); if (Math.abs(view.R - S.R) < .01) view.R = S.R;
     buildIsland(); fitShadow();
   } else if (S.pending) { populate(S.pending.r0, S.pending.r1); S.pending = null; }
-  syncScene(rdt, now); lights(); skyTick(rdt, now / 1000);
+  syncScene(rdt, now); lights(); skyTick(rdt, now / 1000, realDt);
   // カメラ
   const sel = ui.follow && byId(ui.selected);
   if (sel) focusOn(sel.x, sel.z);
@@ -2100,7 +2222,7 @@ function frame(now) {
   if (Math.abs(viewOff - wantOff) > .5) { viewOff += (wantOff - viewOff) * Math.min(1, rdt * 5); camera.setViewOffset(innerWidth, innerHeight, 0, viewOff, innerWidth, innerHeight); }
   if (zoomTo) { camera.zoom += (zoomTo - camera.zoom) * Math.min(1, rdt * 3); camera.updateProjectionMatrix(); if (Math.abs(zoomTo - camera.zoom) < .01) zoomTo = null; }
   controls.update();
-  renderer.render(scene, camera);
+  if (!formOpen) renderer.render(scene, camera);
   if (shotQueue.length) { const sq = shotQueue[0]; sq.t -= rdt; if (sq.t <= 0) { shotQueue.shift(); captureScene(sq.key, sq.x, sq.z); } }
   bubblesTick(rdt);
   if ((hudT -= rdt) <= 0) { hudT = .4; updateHud(); }
@@ -2187,4 +2309,4 @@ addEventListener('pagehide', () => { if (!resetting) save(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { });
 
 // 動作確認用
-if (/[?&]debug\b/.test(location.search)) window.__hkc = { get S() { return S; }, get ROOT() { return ROOT; }, simStep, addSamples, openForm, ui, camera, controls, createPerson, traitsFrom, startEv, goal };
+if (/[?&]debug\b/.test(location.search)) window.__hkc = { get S() { return S; }, get ROOT() { return ROOT; }, simStep, addSamples, openForm, ui, camera, controls, createPerson, traitsFrom, startEv, goal, showAway, story, stampShow, toast, prep, rain, headShot, renderer, buildAvatar, get stage() { return stage; } };
