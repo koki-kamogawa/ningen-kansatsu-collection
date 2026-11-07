@@ -69,9 +69,10 @@ const TYPES = {
   lamp:    { name: '街灯',     wood: 1, stone: 2, work: 8 },
   flowers: { name: '花壇',     wood: 1, stone: 1, work: 7 },
   stall:   { name: '屋台',     wood: 5, stone: 1, work: 28 },
+  school:  { name: '学校',     wood: 8, stone: 4, work: 44 },
 };
 // その人のいちばん強い性格が「島に欲しいもの」を決める
-const WISH = { soc: ['bench', 'stall'], act: ['field', 'tower'], tidy: ['path', 'lamp'], cur: ['tower', 'flowers'], kind: ['well', 'flowers'] };
+const WISH = { soc: ['bench', 'stall'], act: ['field', 'tower'], tidy: ['path', 'lamp'], cur: ['tower', 'flowers', 'school'], kind: ['well', 'flowers', 'school'] };
 const LEVELS = [
   { need: 0, name: '野原', R: 9 }, { need: 4, name: '集落', R: 10.5 }, { need: 10, name: '小さな村', R: 12 },
   { need: 18, name: '村', R: 13.5 }, { need: 28, name: '町', R: 15 }, { need: 40, name: '島の都', R: 16.5 },
@@ -106,6 +107,21 @@ const TAG_LINES = {
   'ゆっくり動いていた': ['ベンチから立ち上がるまでに、雲が一つ流れていった', '急いでいる人に、道をゆずっていた'],
 };
 const STOCK = { x: 1.35, z: -1.0 };
+// 文明の時代。島の大きさ（LEVELS）がそろうと、だれかが「思いつき」、時代が進む
+const ERAS = [
+  { name: 'たき火の時代', lv: 0 },
+  { name: '道具の時代', lv: 1, inv: ['cur', 'tidy'], idea: '石と木を組み合わせて、道具を作った', after: '木を切るのも石を掘るのも、ずっと速くなった' },
+  { name: 'お金の時代', lv: 2, inv: ['tidy', 'soc'], idea: '貝がらに印をつけて「お金」を作った', after: '働くとお金がもらえて、お金で物が買える' },
+  { name: '祭りの時代', lv: 3, inv: ['soc', 'act'], idea: '「みんなで集まる日を作ろう」と言い出した', after: '5日に1度、焚き火のまわりで祭りが開かれる' },
+  { name: '学びの時代', lv: 4, inv: ['cur', 'kind'], idea: '知っていることを、ほかの人に教えはじめた', after: '学校が建てられるようになり、探検での発見が増えた' },
+  { name: '灯りの時代', lv: 5, inv: ['tidy', 'cur'], idea: '夜を明るくする方法を思いついた', after: '島じゅうに灯りがともり、夜が明るくなった' },
+];
+const ERA_WAIT = 25;
+const EV_NAME = { storm: '嵐', bounty: '豊作', stars: '流れ星の夜', market: '市場の日', festival: '祭り', puppy: '子犬', birthday: '誕生日' };
+const EV_TIME = { storm: [.32, .5], bounty: [.3, .31], stars: [.76, .84], market: [.42, .56], puppy: [.36, .37] };
+// 季節は本物の日付に合わせる
+const SEASON = (() => { const m = new Date().getMonth() + 1; return m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter'; })();
+const SEASON_NAME = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' };
 // ① 役まわりは全部で16。図鑑に枠を並べ、空いている枠は「どんな人を探せばいいか」を出す
 const TYPES16 = [
   ['大工', 'よく動いて、きっちりした人'], ['にぎやか係', 'よく動いて、話し好きな人'], ['冒険家', 'よく動いて、寄り道が好きな人'], ['働き者', 'よく動いて、世話焼きな人'],
@@ -125,6 +141,11 @@ const SCENES = [
   ['well', '井戸', '世話焼きな人の思いつき'], ['stall', '屋台', '話し好きな人の思いつき'], ['tower', '見晴らし台', '寄り道好きな人の思いつき'],
   ['level1', '集落になった', '建物が4つになると'], ['level3', '村になった', '建物が18になると'], ['level5', '島の都', '建物が40になると'],
   ['full_house', 'にぎやかな島', '1つの島に8人'], ['move_in', '引っ越し', 'ほかの島から人を呼ぶ'], ['reunion', '再会', '仲良しを、別の島で会わせる'],
+  ['era1', '道具の時代', '島が集落になると、だれかが思いつく'], ['era2', 'お金の時代', '小さな村で、きっちりした話し好きが'], ['era3', '祭りの時代', '村になると、にぎやかな人が'],
+  ['era4', '学びの時代', '町になると、寄り道好きの世話焼きが'], ['era5', '灯りの時代', '島の都で、最後の思いつき'],
+  ['storm', '嵐', 'ある日とつぜん'], ['bounty', '豊作', '運のいい日'], ['stars', '流れ星の夜', '晴れた夜に、たまに'], ['market', '市場の日', 'お金と屋台がそろうと'],
+  ['festival', 'はじめての祭り', '祭りの時代になると、5日に1度'], ['puppy', '子犬', '島がにぎやかになったころ'], ['birthday', '誕生日', '島に来て10日目'],
+  ['upgrade', '2階建て', 'お金をためた人の家'], ['gift', 'おごり', '話し好きはお金を使いたがる'], ['lend', 'お金の貸し借り', '世話焼きとお金のない人'], ['repay', '返済', '借りたお金、返せるかな'],
 ];
 let shotQueue = [];
 function sceneHit(key, at, text) {
@@ -236,7 +257,7 @@ function populate(r0, r1) {
   put(S.bushes, nB, p => ({ id: nid(), x: p.x, z: p.z, berries: true, re: 0 }));
 }
 
-const RAD = { house: .85, field: 1.05, tower: .65, stall: .7, well: .55, bench: .5, lamp: .3, flowers: .5, path: 0 };
+const RAD = { school: 1.0, house: .85, field: 1.05, tower: .65, stall: .7, well: .55, bench: .5, lamp: .3, flowers: .5, path: 0 };
 function blocked(x, z, clear) {
   if (Math.hypot(x, z) < 2.1) return true;
   if (Math.hypot(x - STOCK.x, z - STOCK.z) < .9) return true;
@@ -470,6 +491,10 @@ function prep(p) {
       const b = sById(a.sid); if (!b) return false;
       const off = rand(-.32, .32); a.tx = b.x + Math.sin(b.rot) * .06 + Math.cos(b.rot) * off; a.tz = b.z + Math.cos(b.rot) * .06 - Math.sin(b.rot) * off; return true;
     }
+    case 'shelter': { const h = homeOf(p); if (h) { const d = doorOf(h); a.tx = d.x; a.tz = d.z; a.home = h.id; } else { const g = rand(0, 6.283); a.tx = Math.cos(g) * 1.2; a.tz = Math.sin(g) * 1.2; } return true; }
+    case 'fest': { const g = rand(0, 6.283), r = rand(1.7, 2.4); a.tx = Math.cos(g) * r; a.tz = Math.sin(g) * r; return true; }
+    case 'shop': { const st = sById(a.sid); if (!st) return false; a.tx = st.x + Math.sin(st.rot) * .7; a.tz = st.z + Math.cos(st.rot) * .7; return true; }
+    case 'party': return !!byId(a.pid);
     case 'care': a.step = 'fetch'; a.tx = STOCK.x + rand(-.3, .3); a.tz = STOCK.z + .5; return true;
     case 'plant': {
       const h = homeOf(p), sp = spot(2.4, walkR(), .9, { x: h ? h.x : p.x, z: h ? h.z : p.z, r0: 1, r1: 3 }); if (!sp) return false;
@@ -505,6 +530,11 @@ function runAct(p, dt) {
     a.t -= dt; if (a.t <= 0) endAct(p);
     return;
   }
+  if (a.k === 'party' && a.ph === 'go') {
+    const o = byId(a.pid); if (!o || o.inside) return endAct(p);
+    if (moveTo(p, o.x, o.z, dt, .7)) { a.ph = 'work'; a.t = rand(5, 8); face(p, o); }
+    return;
+  }
   if (a.k === 'care' && a.step === 'deliver') {
     const o = byId(a.pid); if (!o || asleep(o)) { if (p.carry) { S.stock.food++; p.carry = null; } return endAct(p); }
     if (moveTo(p, o.x, o.z, dt, .55)) {
@@ -520,7 +550,7 @@ function runAct(p, dt) {
   if (a.ph === 'ret') {
     if (moveTo(p, a.tx, a.tz, dt)) {
       const k = p.carry; p.carry = null;
-      S.stock[k] += k === 'food' && p.traits.tidy > .7 ? 3 : 2; p.stats.carried++;
+      S.stock[k] += k === 'food' && p.traits.tidy > .7 ? 3 : 2; p.stats.carried++; pay(p, 1);
       endAct(p);
     }
   }
@@ -531,8 +561,8 @@ function arrive(p, a) {
   switch (a.k) {
     case 'sleep': a.t = 1e9; if (a.home) p.inside = true; break;
     case 'eat': a.t = 2.4; break;
-    case 'wood': { const o = S.trees.find(t => t.id === a.oid); if (!o || o.s < .95) return endAct(p); face(p, o); a.t = 4.2 - p.traits.act * 1.2; break; }
-    case 'stone': { const o = S.rocks.find(r => r.id === a.oid); if (!o || o.amt <= 0) return endAct(p); face(p, o); a.t = 4.8 - p.traits.act * 1.2; break; }
+    case 'wood': { const o = S.trees.find(t => t.id === a.oid); if (!o || o.s < .95) return endAct(p); face(p, o); a.t = (4.2 - p.traits.act * 1.2) * ((S.era || 0) >= 1 ? .7 : 1); break; }
+    case 'stone': { const o = S.rocks.find(r => r.id === a.oid); if (!o || o.amt <= 0) return endAct(p); face(p, o); a.t = (4.8 - p.traits.act * 1.2) * ((S.era || 0) >= 1 ? .7 : 1); break; }
     case 'food': { const o = S.bushes.find(b => b.id === a.oid); if (!o || !o.berries) return endAct(p); face(p, o); a.t = 2.6; break; }
     case 'harvest': a.t = 4; break;
     case 'build': { const s = sById(a.sid); if (!s || s.done) return endAct(p); face(p, s.type === 'path' ? pathMid(s) : s); a.t = 9 + p.traits.tidy * 5; (s.helpers ||= []).includes(p.id) || s.helpers.push(p.id); break; }
@@ -540,6 +570,9 @@ function arrive(p, a) {
     case 'wander': a.t = rand(1.5, 4); break;
     case 'sit': { a.t = rand(9, 16); const b = sById(a.sid); if (b) p.dir = b.rot; break; }
     case 'plant': a.t = 3; break;
+    case 'shelter': a.t = 1e9; if (a.home) p.inside = true; bubble(p, '☔'); break;
+    case 'fest': a.t = 1e9; { const o = { x: 0, z: 0 }; face(p, o); } break;
+    case 'shop': a.t = 2.2; bubble(p, '🛍️'); break;
     case 'care':
       if (S.stock.food <= 0) return endAct(p);
       S.stock.food--; p.carry = 'food'; a.step = 'deliver'; a.ph = 'go'; break;
@@ -557,6 +590,8 @@ function work(p, a, dt) {
     return;
   }
   if (a.k === 'nap') { p.needs.energy = Math.min(1, p.needs.energy + dt * .02); return; }
+  if (['shelter', 'look', 'fest'].includes(a.k)) { if (!evOn()) { p.inside = false; endAct(p); } else if (a.k === 'fest' && Math.random() < dt * .25) bubble(p, pick(['🎶', '😆', '🎉'])); else if (a.k === 'look' && Math.random() < dt * .15) bubble(p, '🌠'); return; }
+  if (a.k === 'party') { const o = byId(a.pid); if (o) face(p, o); if (Math.random() < dt * .5) bubble(p, pick(['🎂', '🎉', '😄'])); return; }
   if (a.k === 'build') {
     const s = sById(a.sid); if (!s || s.done) return endAct(p);
     s.work += (.6 + p.traits.act * .5 + p.traits.tidy * .3) * dt;
@@ -570,8 +605,10 @@ function work(p, a, dt) {
 
 function done(p, a) {
   switch (a.k) {
+    case 'shop': { const st = sById(a.sid), o = st && byId(st.owner); if (o && (p.coins || 0) > 0) { const n = Math.min(p.coins, 1 + Math.floor(Math.random() * 3)); p.coins -= n; o.coins = (o.coins || 0) + n; coinPop(o, n); } break; }
+    case 'party': { const o = byId(a.pid); if (o) bumpRel(p, o, .2); break; }
     case 'eat':
-      if (a.src === 'stock') { if (S.stock.food <= 0) break; S.stock.food--; }
+      if (a.src === 'stock') { if (S.stock.food <= 0) break; S.stock.food--; if (money() && (p.coins || 0) >= 1) { const sh = S.structures.filter(x => x.type === 'stall' && x.done && x.owner !== p.id).map(x => byId(x.owner)).filter(Boolean); if (sh.length) { const o = pick(sh); p.coins--; o.coins = (o.coins || 0) + 1; if (Math.random() < .4) coinPop(o, 1); } } }
       else { const b = S.bushes.find(b => b.id === a.bid); if (!b || !b.berries) break; b.berries = false; b.re = 0; }
       p.needs.hunger = Math.max(0, p.needs.hunger - .75); bubble(p, pick(['🍎', '😋']));
       break;
@@ -594,11 +631,11 @@ function done(p, a) {
       return;
     }
     case 'harvest': {
-      const f = sById(a.sid); if (f) { f.ripe = 0; f.claim = 0; S.stock.food += 5; p.stats.carried++; bubble(p, '🌾'); sceneHit('harvest', p, `${nm(p)}が畑ではじめて収穫した`); }
+      const f = sById(a.sid); if (f) { f.ripe = 0; f.claim = 0; S.stock.food += 5; p.stats.carried++; bubble(p, '🌾'); pay(p, 2); sceneHit('harvest', p, `${nm(p)}が畑ではじめて収穫した`); }
       break;
     }
     case 'explore':
-      if (Math.random() < .2 + p.traits.cur * .15) {
+      if (Math.random() < .2 + p.traits.cur * .15 + ((S.era || 0) >= 4 ? .1 : 0)) {
         p.stats.found++; bubble(p, pick(['🍀', '🪶', '🌰', '❗']));
         const line = tagLine(p) || pick(FINDS); addLog(`${nm(p)}が${line}`, p.id); sceneHit('find', p, `${nm(p)}が${line}`); if (tagLine.last === 'イヤホンで自分の世界にいた') sceneHit('music', p, `${nm(p)}が${line}`);
       }
@@ -667,12 +704,13 @@ function resolveTalk(p, o, argue) {
   bumpRel(p, o, argue ? -.35 : .14 + c * .22 + (p.traits.soc + o.traits.soc) * .04);
   p.needs.lonely = Math.max(0, p.needs.lonely - .6); o.needs.lonely = Math.max(0, o.needs.lonely - .6);
   p.stats.talked++; o.stats.talked++;
+  tryMoney(p, o, argue);
 }
 
 // ---------- 建てる ----------
 const count = t => S.structures.filter(s => s.type === t).length;
 const afford = t => S.stock.wood >= TYPES[t].wood && S.stock.stone >= TYPES[t].stone;
-const LIMIT = { bench: () => 1 + Math.floor(S.people.length / 3), stall: () => 2, well: () => 2, tower: () => 2, lamp: () => 1 + Math.floor(S.people.length / 2), flowers: () => 1 + Math.floor(S.people.length / 2), field: () => Math.ceil(S.people.length / 2) + 1, path: () => 99 };
+const LIMIT = { school: () => (S.era || 0) >= 4 ? 1 : 0, bench: () => 1 + Math.floor(S.people.length / 3), stall: () => 2, well: () => 2, tower: () => 2, lamp: () => 1 + Math.floor(S.people.length / 2) + ((S.era || 0) >= 5 ? 4 : 0), flowers: () => 1 + Math.floor(S.people.length / 2), field: () => Math.ceil(S.people.length / 2) + 1, path: () => 99 };
 function pathMid(s) { const a = s.pts[0], b = s.pts[s.pts.length - 1]; return { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }; }
 
 function spotFor(type, p) {
@@ -684,6 +722,7 @@ function spotFor(type, p) {
     case 'well': return spot(2.4, 4.8, 1.2);
     case 'tower': return spot(w * .62, w * .92, 1.2);
     case 'stall': return spot(2.3, 3.8, 1.2);
+    case 'school': return spot(3, w * .8, 1.6);
     case 'lamp': { const anchor = pick(S.structures.filter(s => s.done && s.type !== 'path')) || { x: 0, z: 0 }; return spot(2.2, w, .5, { x: anchor.x, z: anchor.z, r0: 1, r1: 1.7 }); }
     case 'flowers': return h ? spot(2.2, w, .7, { x: h.x, z: h.z, r0: 1.1, r1: 1.8 }) : spot(2.4, w, .9);
   }
@@ -738,7 +777,7 @@ function plan() {
 function completeSite(s) {
   s.done = true; s.doneDay = S.day; s.claim = 0;
   const owner = byId(s.owner), helpers = (s.helpers || []).map(byId).filter(Boolean);
-  helpers.forEach(h => h.stats.built++);
+  helpers.forEach(h => { h.stats.built++; pay(h, 3); });
   const others = helpers.filter(h => h !== owner);
   const withTxt = others.length ? `（${others.slice(0, 2).map(h => nm(h)).join('と')}${others.length > 2 ? 'たち' : ''}が手伝った）` : '';
   if (s.type === 'house') addLog(`${owner ? nm(owner) : 'だれか'}の家ができた${withTxt}`, s.owner, 'build');
@@ -762,24 +801,154 @@ function checkLevel() {
   }
 }
 
+// ---------- お金（住人どうしが勝手に使う。プレイヤーは眺めるだけ） ----------
+const money = () => (S.era || 0) >= 2;
+function pay(p, n) { if (!money() || !p) return; p.coins = (p.coins || 0) + n; coinPop(p, n); }
+function moneyStyle(p) { const t = p.traits; return t.tidy > .62 ? 'ため込むタイプ' : t.soc > .6 ? '使うタイプ' : t.kind > .62 ? '人に貸したがる' : 'ふつう'; }
+function tryMoney(p, o, argue) {
+  if (!money() || argue) return;
+  p.coins ||= 0; o.coins ||= 0;
+  if ((p.debt || {})[o.id] && p.coins >= p.debt[o.id] + 2) {
+    const n = p.debt[o.id]; p.coins -= n; o.coins += n; delete p.debt[o.id]; bumpRel(p, o, .3);
+    addLog(`${nm(p)}が${nm(o)}に借りていたお金を返した`, p.id); sceneHit('repay', p, `${nm(p)}が${nm(o)}に借りていたお金を返した`); return;
+  }
+  if (p.traits.kind > .62 && p.coins >= 6 && o.coins < 2 && Math.random() < .5) {
+    p.coins -= 3; o.coins += 3; (o.debt ||= {})[p.id] = (o.debt[p.id] || 0) + 3; coinPop(o, 3);
+    addLog(`${nm(p)}が${nm(o)}にお金を貸した`, p.id); sceneHit('lend', p, `${nm(p)}が${nm(o)}にお金を貸した`); return;
+  }
+  if (p.traits.soc > .6 && p.coins >= 4 && Math.random() < .3) {
+    p.coins -= 2; o.coins += 2; bumpRel(p, o, .2); bubble(p, '🎁');
+    addLog(`${nm(p)}が${nm(o)}にお茶をおごった`, p.id); sceneHit('gift', p, `${nm(p)}が${nm(o)}にお茶をおごった`);
+  }
+}
+function tryUpgrade() {
+  if (!money()) return;
+  for (const p of S.people) {
+    const h = homeOf(p); if (!h || (h.lv || 1) >= 3) continue;
+    const cost = (h.lv || 1) === 1 ? 15 : 35, need = cost + Math.round(p.traits.tidy * 10);   // きっちりした人は余分にためてから使う
+    if ((p.coins || 0) < need) continue;
+    p.coins -= cost; h.lv = (h.lv || 1) + 1; h.rev = (h.rev || 0) + 1;
+    const t = h.lv === 2 ? '2階建て' : '3階建て';
+    addLog(`${nm(p)}がお金をためて、家を${t}にした`, p.id, 'build'); sceneHit('upgrade', h, `${nm(p)}がお金をためて、家を${t}にした`);
+    fx.pop(h); return;
+  }
+}
+
+// ---------- 時代 ----------
+function checkEra(dt) {
+  S.era ||= 0;
+  if (S.people.length < 2 || S.era >= ERAS.length - 1 || S.level < ERAS[S.era + 1].lv) return;
+  S.eraT = (S.eraT || 0) + dt;
+  if (S.eraT < ERA_WAIT) return;
+  const E = ERAS[S.era + 1], inv = S.people.slice().sort((a, b) => (b.traits[E.inv[0]] + b.traits[E.inv[1]]) - (a.traits[E.inv[0]] + a.traits[E.inv[1]]))[0];
+  S.era++; S.eraT = 0;
+  if (S.era === 2) for (const p of S.people) p.coins = (p.coins || 0) + 5;
+  addLog(`${nm(inv)}が${E.idea}。島は「${E.name}」に入った。${E.after}`, inv.id, 'level');
+  sceneHit('era' + S.era, inv, `${nm(inv)}が${E.idea}`);
+  bubble(inv, '💡');
+  if (!quiet) setTimeout(() => stampShow(E.name, `${shortName(inv)}の思いつき`, '時代が変わった'), 400);
+}
+function goal() {
+  const era = S.era || 0;
+  if (S.people.length < 2) return { t: '2人そろうと、島が動きだす', f: S.people.length / 2 };
+  if (era >= ERAS.length - 1) return { t: `${ERAS[era].name} · ${SEASON_NAME[SEASON]}の島`, f: 1 };
+  const E = ERAS[era + 1], built = S.structures.filter(x => x.done).length;
+  if (S.level < E.lv) { const need = LEVELS[E.lv].need; return { t: `次は${E.name} · 建物あと${Math.max(1, need - built)}棟`, f: clamp(built / need, 0, 1) }; }
+  return { t: `次は${E.name} · だれかが思いつきそう`, f: clamp((S.eraT || 0) / ERA_WAIT, 0, 1), think: true };
+}
+
+// ---------- 毎日の出来事 ----------
+function onNewDay() {
+  S.ev = null;
+  if (S.people.length < 2) return;
+  if ((S.era || 0) >= 3 && S.day % 5 === 0) return startEv('festival', .66, .78);
+  const bds = S.people.filter(p => S.day - p.born > 0 && (S.day - p.born) % 10 === 0), bd = bds.length ? pick(bds) : null;
+  if (bd) return startEv('birthday', .4, .55, { pid: bd.id });
+  const pool = [['storm', .13], ['bounty', .12], ['stars', .13]];
+  if (money() && S.structures.some(x => x.type === 'stall' && x.done)) pool.push(['market', .16]);
+  if (!S.dog && S.people.length >= 3) pool.push(['puppy', .16]);
+  let r = Math.random();
+  for (const [k, w] of pool) { if (r < w) return startEv(k, ...EV_TIME[k]); r -= w; }
+}
+function startEv(k, t0, t1, data = {}) { S.ev = { k, t0, t1, data, on: false, done: false, did: [] }; }
+const evOn = k => S.ev && S.ev.on && !S.ev.done && (!k || S.ev.k === k);
+function evLog(text, k, at) { addLog(text, null, 'event'); sceneHit(k, at || { x: 0, z: 0 }, text); if (!quiet) toast(text); }
+function runEvent() {
+  const e = S.ev; if (!e || e.done) return;
+  if (!e.on && S.time >= e.t0 && S.time < e.t1 + .05) {
+    e.on = true;
+    for (const p of S.people) if (p.act && !asleep(p) && !['sleep'].includes(p.act.k)) endAct(p);
+    switch (e.k) {
+      case 'storm': evLog('嵐が来た。みんな家や焚き火のそばに逃げこんだ', 'storm'); break;
+      case 'bounty':
+        for (const b of S.bushes) b.berries = true; for (const f of S.structures) if (f.type === 'field' && f.done) f.ripe = 1; S.stock.food += 6;
+        evLog('豊作だ。木の実が島じゅうに実った', 'bounty'); S.people.forEach(p => bubble(p, '😋')); break;
+      case 'stars': evLog('夜空に、流れ星がいくつも降った', 'stars'); break;
+      case 'market': evLog('市場の日。屋台のまわりに人が集まった', 'market', S.structures.find(x => x.type === 'stall')); break;
+      case 'festival': evLog(S.festN ? '祭りの日。焚き火のまわりにみんなが集まった' : 'はじめての祭り。焚き火のまわりで、みんなが踊った', 'festival'); S.festN = (S.festN || 0) + 1; break;
+      case 'birthday': { const p = byId(e.data.pid); if (!p) { e.done = true; return; } evLog(`${nm(p)}が島に来て${S.day - p.born}日。友だちが集まってお祝いした`, 'birthday', p); break; }
+      case 'puppy': {
+        const k = S.people.slice().sort((a, b) => b.traits.kind - a.traits.kind)[0], g = rand(0, 6.283);
+        S.dog = { x: Math.cos(g) * walkR() * .9, z: Math.sin(g) * walkR() * .9, dir: 0, owner: k.id, moving: false };
+        evLog(`どこからか子犬がやってきた。${nm(k)}になついている`, 'puppy', k); break;
+      }
+    }
+  }
+  if (e.on && (S.time >= e.t1 || S.time < e.t0 - .05)) {
+    e.done = true;
+    if (e.k === 'storm') {
+      const fall = S.trees.filter(t => t.s >= .9).sort(() => Math.random() - .5).slice(0, 3); fall.forEach(t => { t.s = .05; t.claim = 0; });
+      addLog(`嵐が去った。木が${fall.length}本倒れていた`, null, 'event');
+    }
+    if (e.k === 'festival') { const d = S.people.slice().sort((a, b) => b.traits.act - a.traits.act)[0]; if (d) addLog(`祭りが終わった。いちばん踊っていたのは${nm(d)}だった`, d.id, 'event'); }
+    for (const p of S.people) if (p.act && ['shelter', 'look', 'fest'].includes(p.act.k)) { p.inside = false; endAct(p); }
+  }
+}
+// 出来事の日は、いつもの暮らしより出来事が優先される
+function eventAct(p) {
+  const e = S.ev; if (!evOn() || e.did.includes(p.id)) return false;
+  switch (e.k) {
+    case 'storm': e.did.push(p.id); setAct(p, 'shelter'); return true;
+    case 'stars': e.did.push(p.id); setAct(p, 'look'); p.act.ph = 'work'; p.act.t = 1e9; return true;
+    case 'festival': e.did.push(p.id); setAct(p, 'fest'); return true;
+    case 'market': { e.did.push(p.id); const st = S.structures.filter(x => x.type === 'stall' && x.done && x.owner !== p.id); if (!st.length || (p.coins || 0) < 1) return false; setAct(p, 'shop', { sid: pick(st).id }); return true; }
+    case 'birthday': { e.did.push(p.id); const o = byId(e.data.pid); if (!o || o === p || (p.rel[o.id] || 0) < .4) return false; setAct(p, 'party', { pid: o.id }); return true; }
+  }
+  return false;
+}
+function dogStep(dt) {
+  const d = S.dog; if (!d) return;
+  const o = byId(d.owner);
+  let tx = d.x, tz = d.z;
+  if (o && !o.inside) { tx = o.x - Math.sin(o.dir) * .55; tz = o.z - Math.cos(o.dir) * .55; }
+  else if (Math.random() < dt * .3) { d.wx = rand(-3, 3); d.wz = rand(-3, 3); }
+  if (!(o && !o.inside) && d.wx !== undefined) { tx = d.wx; tz = d.wz; }
+  const dx = tx - d.x, dz = tz - d.z, dd = Math.hypot(dx, dz);
+  d.moving = dd > .25;
+  if (d.moving) { const st = Math.min(dd, (dd > 2 ? 2.2 : 1.1) * dt); d.x += dx / dd * st; d.z += dz / dd * st; d.dir = Math.atan2(dx, dz); }
+  clampWalk(d);
+}
+
 // ---------- 1歩すすめる ----------
 let planT = 0;
 function simStep(dt) {
   S.time += dt / DAY;
-  if (S.time >= 1) { S.time -= 1; S.day++; }
+  if (S.time >= 1) { S.time -= 1; S.day++; onNewDay(); }
+  runEvent(); checkEra(dt); dogStep(dt);
   for (const t of S.trees) if (t.s < 1) t.s = Math.min(1, t.s + dt / 150);
   for (const b of S.bushes) if (!b.berries && (b.re += dt) > 75) { b.berries = true; b.re = 0; }
   for (const r of S.rocks) if (r.amt <= 0 && (r.re += dt) > 200) {
     const sp = spot(2.4, walkR(), .9); if (sp) { r.x = sp.x; r.z = sp.z; } r.amt = 4; r.re = 0;
   }
   for (const s of S.structures) if (s.type === 'field' && s.done && s.ripe < 1) s.ripe = Math.min(1, s.ripe + dt / 95);
-  if ((planT -= dt) <= 0) { planT = 5; plan(); }
+  if ((planT -= dt) <= 0) { planT = 5; plan(); tryUpgrade(); }
   for (const p of S.people) {
     const n = p.needs, sl = asleep(p);
     n.hunger = clamp(n.hunger + dt * .0042, 0, 1);
     if (!sl) n.energy = clamp(n.energy - dt * .0028 * (.7 + p.traits.act * .6), 0, 1);
     n.lonely = clamp(n.lonely + dt * .0035 * (.4 + p.traits.soc), 0, 1);
     if (p.chrono > 0 && !asleep(p) && S.time > .8 && S.time < .9 && S.people.filter(asleep).length >= 2) sceneHit('night_owl', p, `みんなが寝たあとも、${nm(p)}はまだ起きていた`);
+    if (evOn() && !S.ev.did.includes(p.id) && !asleep(p) && !(p.act && p.act.k === 'sleep')) { if (p.act) endAct(p); eventAct(p); }
     if (!p.act) decide(p);
     if (p.act) runAct(p, dt);
     clampWalk(p);
@@ -874,12 +1043,14 @@ function buildIsland() {
   let g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
   // 上面は頂点ごとに色をつけてなめらかに（三角形の継ぎ目を見せない）
   const low = new THREE.Color('#B2C677'), high = new THREE.Color('#6A9852'), rim = new THREE.Color('#79994F'), plazaC = new THREE.Color('#C2C88E');
+  const seasonTint = SEASON === 'winter' ? [new THREE.Color('#E9EDEF'), .62] : SEASON === 'autumn' ? [new THREE.Color('#C9B064'), .18] : null;
   const cols = new Float32Array(pos.length);
   for (let v = 0; v < pos.length / 3; v++) {
     const x = pos[v * 3], y = pos[v * 3 + 1], z = pos[v * 3 + 2], r = Math.hypot(x, z), ri = v === 0 ? 0 : r / edgeR(Math.atan2(z, x)) * N;
     _c.copy(low).lerp(high, clamp(y / 1.05, 0, 1));
     if (ri > N - 1.4) _c.lerp(rim, smooth(N - 1.4, N, ri));
     if (ri < 2.4) _c.lerp(plazaC, (1 - smooth(1.2, 2.4, ri)) * .7);
+    if (seasonTint) _c.lerp(seasonTint[0], seasonTint[1]);
     _c.offsetHSL(0, 0, (vnoise(x * .9, z * .9, S.seed + 30) - .5) * .05);
     cols[v * 3] = _c.r; cols[v * 3 + 1] = _c.g; cols[v * 3 + 2] = _c.b;
   }
@@ -966,12 +1137,14 @@ for (let i = 0; i < 10; i++) { const m = mesh(sph(.045, 6, 5), mat('#C8432B'), f
 
 // ---- 木・岩・茂み ----
 const GREENS = ['#6F9A4E', '#5E8C4A', '#88A85A', '#7DA35F'];
+const SEASON_LEAF = { spring: ['#F2C4CE', '#EBB2C0', '#F6D6DC', '#88A85A'], autumn: ['#D98A3A', '#C8642E', '#E0B048', '#B8743A'], winter: ['#5E7A5A', '#6A8562', '#577255', '#6E8A66'] };
 function makeTree(t) {
-  const g = new THREE.Group(), c = mat(GREENS[t.c || 0]);
+  const leaf = t.k === 1 && SEASON_LEAF[SEASON] ? SEASON_LEAF[SEASON] : SEASON === 'winter' ? SEASON_LEAF.winter : GREENS;
+  const g = new THREE.Group(), c = mat(leaf[t.c || 0]);
   const trunk = mesh(cyl(.06, .12, .42, 6), mat('#8B6440')); trunk.position.y = .21; g.add(trunk);
   const crown = new THREE.Group(); g.add(crown);
   if (t.k === 0) { const a = mesh(cone(.42, .72, 7), c); a.position.y = .66; const b = mesh(cone(.3, .56, 7), c); b.position.y = 1.0; crown.add(a, b); }
-  else { const a = mesh(ico(.36, 1), c); a.position.y = .74; const b = mesh(ico(.28, 1), c); b.position.set(.2, .96, .08); const d = mesh(ico(.26, 1), mat(GREENS[(t.c + 1) % 4])); d.position.set(-.18, .9, -.1); crown.add(a, b, d); }
+  else { const a = mesh(ico(.36, 1), c); a.position.y = .74; const b = mesh(ico(.28, 1), c); b.position.set(.2, .96, .08); const d = mesh(ico(.26, 1), mat(leaf[(t.c + 1) % 4])); d.position.set(-.18, .9, -.1); crown.add(a, b, d); }
   g.userData = { trunk, crown, ph: rand(0, 6.28) };
   g.rotation.y = rand(0, 6.28);
   return g;
@@ -994,18 +1167,30 @@ function makeStructure(s) {
   switch (s.type) {
     case 'house': {
       const tidy = owner ? owner.traits.tidy : .5, logHouse = tidy < .42;
-      add(mesh(box(.92, .62, .8), mat(logHouse ? '#C49A6C' : '#EFE8DC')), 0, .31, 0);
-      const roof = add(mesh(cone(.8, .52, 4), mat(oc === '#EDE9E1' ? '#B9B0A4' : oc)), 0, .88, 0); roof.rotation.y = Math.PI / 4; roof.scale.z = .9;
+      const lv = s.lv || 1, up = (lv - 1) * .5, wallM = mat(logHouse ? '#C49A6C' : '#EFE8DC');
+      add(mesh(box(.92, .62, .8), wallM), 0, .31, 0);
+      for (let f = 1; f < lv; f++) { add(mesh(box(.84, .5, .74), wallM), 0, .62 + (f - 1) * .5 + .25, 0); add(mesh(box(.2, .15, .03), mat('#4A505C'), false), -.18, .62 + (f - 1) * .5 + .28, .375); add(mesh(box(.2, .15, .03), mat('#4A505C'), false), .2, .62 + (f - 1) * .5 + .28, .375); }
+      if (lv >= 3) { add(mesh(box(.5, .04, .2), mat('#9C7350')), 0, 1.13, .46); const f = add(mesh(box(.2, .12, .01), mat(oc, { side: THREE.DoubleSide }), false), .45, 1.95 + .2, 0); g.userData.flag = f; add(mesh(cyl(.012, .012, .5, 4), mat('#3B3B3B')), .35, 1.95, 0); }
+      const roof = add(mesh(cone(.8, .52, 4), mat(oc === '#EDE9E1' ? '#B9B0A4' : oc)), 0, .88 + up, 0); roof.rotation.y = Math.PI / 4; roof.scale.z = .9;
       add(mesh(box(.19, .34, .03), mat('#6B4B33')), -.15, .17, .41);
       const win = new THREE.MeshLambertMaterial({ color: '#4A505C', emissive: '#FFC56E', emissiveIntensity: 0 });
       add(mesh(box(.2, .17, .03), win, false), .2, .36, .41);
-      add(mesh(box(.12, .28, .12), mat('#8C8379')), .26, 1.0, -.15);
-      add(mesh(box(.17, .04, .17), mat('#5E5750')), .26, 1.15, -.15);
-      add(mesh(box(.98, .04, .86), mat('#5E5047')), 0, .63, 0);
+      add(mesh(box(.12, .28, .12), mat('#8C8379')), .26, 1.0 + up, -.15);
+      add(mesh(box(.17, .04, .17), mat('#5E5750')), .26, 1.15 + up, -.15);
+      add(mesh(box(.98, .04, .86), mat('#5E5047')), 0, .63 + up, 0);
       add(mesh(box(.26, .23, .02), mat('#F4F0E8'), false), .2, .36, .405);
       add(mesh(box(.27, .04, .14), mat('#B9B0A4'), false, true), -.15, .02, .5);
       add(mesh(box(.94, .06, .82), mat('#8C8379'), false, true), 0, .03, 0);
       g.userData.win = win;
+      break;
+    }
+    case 'school': {
+      add(mesh(box(1.5, .7, .9), mat('#EDE4D3')), 0, .35, 0);
+      const r = add(mesh(cone(1.0, .5, 4), mat('#6F8FA8')), 0, .95, 0); r.rotation.y = Math.PI / 4; r.scale.set(1.1, 1, .7);
+      add(mesh(box(.3, .5, .3), mat('#EDE4D3')), 0, 1.35, 0); add(mesh(cone(.26, .3, 4), mat('#6F8FA8')), 0, 1.75, 0).rotation.y = Math.PI / 4;
+      add(mesh(sph(.07, 8, 6), mat('#D9B44A'), false), 0, 1.4, .16);
+      for (const x of [-.5, -.17, .17, .5]) add(mesh(box(.2, .2, .02), mat('#4A505C'), false), x, .42, .46);
+      add(mesh(box(.26, .36, .03), mat('#6B4B33')), 0, .18, .46);
       break;
     }
     case 'field': {
@@ -1074,6 +1259,7 @@ function makeStructure(s) {
     for (const [x, z] of [[-r * .6, r + .25], [r * .5, -r - .25]]) { const m = mesh(box(.32, .1, .12), mat('#9A6E45'), false); m.position.set(x, .05, z); scaf.add(m); }
     g.add(scaf); g.userData.scaf = scaf;
   }
+  g.userData.rev = s.rev || 0;
   g.traverse(o => { if (o.isMesh) o.userData.sid = s.id; });
   g.rotation.y = s.type === 'path' ? 0 : s.rot;
   return g;
@@ -1182,6 +1368,69 @@ const poolGeo = new THREE.CircleGeometry(1, 24);
 function pool(r) { const m = new THREE.Mesh(poolGeo, POOL); m.rotation.x = -Math.PI / 2; m.scale.setScalar(r); m.position.y = .04; return m; }
 const CARRY = { wood: '#9A6E45', stone: '#A8A096', food: '#C8432B' };
 
+// ---- 子犬 ----
+const dogM = new THREE.Group(); {
+  const fur = mat('#C9A27A'), dark = mat('#7A5A3E');
+  const b = mesh(box(.3, .17, .15), fur, false); b.position.y = .17; dogM.add(b);
+  const h = mesh(box(.15, .14, .14), fur, false); h.position.set(0, .28, .16); dogM.add(h);
+  for (const x of [-.05, .05]) { const e = mesh(box(.04, .07, .03), dark, false); e.position.set(x, .37, .14); dogM.add(e); const ey = mesh(sph(.014, 5, 4), mat('#1F1C19'), false); ey.position.set(x * .8, .3, .235); dogM.add(ey); }
+  for (const [x, z] of [[-.1, -.05], [.1, -.05], [-.1, .05], [.1, .05]]) { const l = mesh(box(.05, .1, .05), fur, false); l.position.set(x, .05, z * 1.6); dogM.add(l); }
+  const tail = mesh(cyl(.015, .02, .14, 4), fur, false); tail.position.set(0, .26, -.12); tail.rotation.x = -.8; dogM.add(tail); dogM.userData.tail = tail;
+  const bl = new THREE.Mesh(geo('blob', () => new THREE.CircleGeometry(.3, 20)), BLOB); bl.rotation.x = -Math.PI / 2; bl.position.y = .02; bl.scale.setScalar(.7); dogM.add(bl);
+  dogM.scale.setScalar(1.3); dogM.rotation.order = 'YXZ'; dogM.visible = false; scene.add(dogM);
+}
+// ---- 雨・雪 ----
+function makeFall(n, color, size) {
+  const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { p[i * 3] = rand(-14, 14); p[i * 3 + 1] = rand(0, 12); p[i * 3 + 2] = rand(-14, 14); }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color, size, transparent: true, opacity: .75, depthWrite: false, sizeAttenuation: false }));
+  m.visible = false; m.frustumCulled = false; scene.add(m); return m;
+}
+const snow = makeFall(260, '#FFFFFF', 3.2);
+// 雨は短い線で降らせる（点だと雪に見える）
+const rain = (() => {
+  const n = 600, g = new THREE.BufferGeometry(), p = new Float32Array(n * 6);
+  for (let i = 0; i < n; i++) { const x = rand(-14, 14), y = rand(0, 12), z = rand(-14, 14); p.set([x, y, z, x - .06, y + .45, z - .06], i * 6); }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#C9D3DC', transparent: true, opacity: .55, depthWrite: false }));
+  m.visible = false; m.frustumCulled = false; scene.add(m); return m;
+})();
+// ---- 花火・流れ星 ----
+const sparkGeo = new THREE.BufferGeometry(); const SP_N = 360; sparkGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SP_N * 3), 3)); sparkGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SP_N * 3), 3));
+const sparksM = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ size: 7, map: radialTex('rgba(255,255,255,1)'), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: false }));
+sparksM.frustumCulled = false; scene.add(sparksM);
+const sparkP = []; let fwT = 0, mtT = 0;
+const FW_COL = ['#FF8A5C', '#FFD36E', '#9FD6FF', '#C8F09A', '#FFB3C8'];
+function burst(x, y, z, n, colHex, speed, life, grav) {
+  const c = new THREE.Color(colHex);
+  for (let i = 0; i < n; i++) { const th = rand(0, 6.283), ph = Math.acos(rand(-1, 1)), sp = speed * rand(.7, 1);
+    sparkP.push({ x, y, z, vx: Math.sin(ph) * Math.cos(th) * sp, vy: Math.cos(ph) * sp, vz: Math.sin(ph) * Math.sin(th) * sp, life, max: life, c, grav }); }
+  if (sparkP.length > SP_N) sparkP.splice(0, sparkP.length - SP_N);
+}
+function skyTick(dt, tsec) {
+  const n = nightness();
+  // 雨・雪は、いま見ている範囲のまわりにだけ降らせる
+  const storm = evOn('storm');
+  for (const [m, on, v] of [[rain, storm, 9], [snow, SEASON === 'winter', .8]]) {
+    m.visible = on; if (!on) continue;
+    m.position.set(controls.target.x, 0, controls.target.z);
+    const a = m.geometry.attributes.position;
+    if (m === rain) { for (let i = 0; i < a.count; i += 2) { let y = a.getY(i) - v * dt; if (y < 0) y += 12; a.setY(i, y); a.setY(i + 1, y + .45); } }
+    else for (let i = 0; i < a.count; i++) { let y = a.getY(i) - v * dt; if (y < 0) y += 12; a.setY(i, y); a.setX(i, a.getX(i) + Math.sin(tsec + i) * dt * .2); }
+    a.needsUpdate = true;
+  }
+  if (evOn('festival') && n > .2) { if ((fwT -= dt) <= 0) { fwT = rand(.5, 1.1); burst(rand(-3, 3), rand(5, 7.5), rand(-3, 3), 50, pick(FW_COL), 2.6, 1.6, 1.4); } }
+  if (evOn('stars')) { if ((mtT -= dt) <= 0) { mtT = rand(.25, .7); const x = rand(-10, 6), z = rand(-10, 6); for (let i = 0; i < 14; i++) sparkP.push({ x: x + i * .18, y: 10 - i * .1, z: z + i * .18, vx: 4, vy: -2, vz: 4, life: .6 - i * .03, max: .6, c: new THREE.Color('#FFF6D8'), grav: 0 }); } }
+  const pa = sparkGeo.attributes.position, ca = sparkGeo.attributes.color;
+  for (let i = sparkP.length - 1; i >= 0; i--) { const q = sparkP[i]; q.life -= dt; if (q.life <= 0) { sparkP.splice(i, 1); continue; } q.vy -= q.grav * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; q.vx *= .985; q.vz *= .985; }
+  for (let i = 0; i < SP_N; i++) { const q = sparkP[i]; if (q) { pa.setXYZ(i, q.x, q.y, q.z); const k = q.life / q.max; ca.setXYZ(i, q.c.r * k, q.c.g * k, q.c.b * k); } else pa.setXYZ(i, 0, -999, 0); }
+  pa.needsUpdate = true; ca.needsUpdate = true;
+  // 子犬
+  const d = S.dog; dogM.visible = !!d;
+  if (d) { dogM.position.set(d.x, groundH(d.x, d.z) + (d.moving ? Math.abs(Math.sin(tsec * 14)) * .05 : 0), d.z); dogM.rotation.y = lerpAngle(dogM.rotation.y, d.dir, .2); dogM.userData.tail.rotation.z = Math.sin(tsec * (d.moving ? 18 : 8)) * .6; }
+}
+
 // ---- 選択の輪 ----
 const ring = mesh(new THREE.RingGeometry(.34, .42, 40), new THREE.MeshBasicMaterial({ color: '#C8432B', transparent: true, opacity: .9, depthWrite: false }), false);
 ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
@@ -1233,6 +1482,7 @@ function syncScene(dt, now) {
   syncList(S.bushes, objs.bushes, makeBush, (b, m) => { m.position.set(b.x, groundH(b.x, b.z) - .02, b.z); m.userData.berries.visible = b.berries; });
   const night = nightness();
   syncList(S.structures, objs.structures, makeStructure, (s, m) => {
+    if (m.userData.rev !== (s.rev || 0)) { scene.remove(m); objs.structures.delete(s.id); return; }
     m.position.set(s.x, s.type === 'path' ? groundH(s.x, s.z) : groundH(s.x, s.z) - .02, s.z);
     const u = m.userData, body = m.children[0];
     if (s.type === 'path') {
@@ -1252,7 +1502,7 @@ function syncScene(dt, now) {
     if (u.crops) { const r = s.ripe || 0; u.crops.scale.set(1, .25 + .75 * r, 1); u.crops.children.forEach(c => c.material = mat(r >= 1 ? '#D9B44A' : '#7FB04F')); }
     if (u.flag) u.flag.rotation.y = Math.sin(tsec * 3 + s.id) * .4;
   });
-  LAMP.emissiveIntensity = night * 2.2; POOL.opacity = night * .55; POOL_DOOR.opacity = night * .3;
+  const lit = (S.era || 0) >= 5 ? 1.5 : 1; LAMP.emissiveIntensity = night * 2.2 * lit; POOL.opacity = night * .55 * lit; POOL_DOOR.opacity = night * .3 * lit;
 
   syncList(S.people, objs.people, makeAvatar, (p, m) => {
     const u = m.userData, a = p.act, y = groundH(p.x, p.z), T = tsec + u.ph;
@@ -1260,13 +1510,15 @@ function syncScene(dt, now) {
     const sitting = a && a.k === 'sit' && a.ph === 'work';
     const working = a && a.ph === 'work' && ['wood', 'stone', 'build', 'harvest', 'plant'].includes(a.k);
     const lying = (a && a.k === 'sleep' && a.ph === 'work' && !p.inside) || (a && a.k === 'nap');
-    const talking = a && (a.k === 'chat' || (a.k === 'talk' && a.ph === 'work'));
+    const talking = a && (a.k === 'chat' || a.k === 'party' && a.ph === 'work' || (a.k === 'talk' && a.ph === 'work'));
+    const dancing = a && a.k === 'fest' && a.ph === 'work', gazing = a && a.k === 'look';
     let hop = 0, sq = 0, lean = 0, armA = 0, headY = 0;
     if (p.moving) {
       // 1歩ごとに小さく跳ね、着地で少しつぶれる
       const f = (6 + p.traits.act * 5) * (u.fast ? 1.4 : 1), sn = Math.sin(T * f);
       hop = Math.abs(sn) * .09; sq = 1 - Math.min(1, Math.abs(sn) * 4); armA = sn * .7; lean = u.fast ? .14 : .05;
-    } else if (working) { const w = Math.max(0, Math.sin(T * 9)); lean = w * .32; armA = -1.1 - w * .9; }
+    } else if (dancing) { hop = Math.abs(Math.sin(T * 7)) * .12; armA = -2.4 + Math.sin(T * 7) * .4; p.dir += dt * 1.6; }
+    else if (working) { const w = Math.max(0, Math.sin(T * 9)); lean = w * .32; armA = -1.1 - w * .9; }
     else if (talking) { hop = Math.abs(Math.sin(T * 3)) * .02; armA = Math.sin(T * 2.2) * .35; }
     else if (!lying && !sitting) {
       headY = Math.sin(T * (u.look ? .9 : .35)) * (u.look ? .8 : .35) * smooth(.3, .9, Math.sin(T * .27) * .5 + .5);
@@ -1281,8 +1533,9 @@ function syncScene(dt, now) {
     u.inner.rotation.x = lerp(u.inner.rotation.x, lean, .2);
     u.inner.rotation.z = lerp(u.inner.rotation.z, lying ? Math.PI / 2 * .92 : 0, .1);
     u.arms[0].rotation.x = lerp(u.arms[0].rotation.x, sitting ? -.7 : armA, .3);
-    u.arms[1].rotation.x = lerp(u.arms[1].rotation.x, sitting ? -.7 : working || (u.book && !p.moving && !talking) ? armA : -armA, .3);
+    u.arms[1].rotation.x = lerp(u.arms[1].rotation.x, sitting ? -.7 : working || dancing || (u.book && !p.moving && !talking) ? armA : -armA, .3);
     u.headG.rotation.y = lerp(u.headG.rotation.y, headY, .1);
+    u.headG.rotation.x = lerp(u.headG.rotation.x, gazing ? -.5 : 0, .08);
     const shut = lying || (T % 5) < .09;
     u.eyes.forEach(e => e.scale.y = shut ? .12 : 1);
     if (u.bird) { u.bird.visible = !p.moving && !lying && Math.sin(T * .13) > .7; if (u.bird.visible && m.visible) sceneHit('bird', p, `${nm(p)}の頭に小鳥がとまった`); }
@@ -1354,6 +1607,7 @@ function lights() {
   hemi.color.copy(_a.set(A[2]).lerp(_b.set(B[2]), k)); hemi.groundColor.copy(_a.set(A[3]).lerp(_b.set(B[3]), k));
   hemi.intensity = lerp(A[4], B[4], k);
   sun.color.copy(_a.set(A[5]).lerp(_b.set(B[5]), k)); sun.intensity = lerp(A[6], B[6], k);
+  if (evOn('storm')) { sky.lerp(_a.set('#9AA3A8'), .55); sun.intensity *= .4; hemi.intensity *= .8; }
   const day = t > .22 && t < .78, ang = day ? (t - .22) / .56 * Math.PI : ((t + (t < .22 ? 1 : 0)) - .78) / .44 * Math.PI;
   sun.position.set(Math.cos(ang) * 22, Math.sin(ang) * 20 + 7, 9);
 
@@ -1468,6 +1722,7 @@ const ui = {
         <div class="no">観察 No.${String(p.no).padStart(3, '0')}</div><h3>${esc(p.name)}</h3>
         <p>${esc(roleOf(p.traits))} · ${esc(p.place || '場所の記録なし')}で観察 · ${p.born}日目に誕生</p></div></div>
       <div class="now"><span class="dot"></span><span id="nowText">${esc(actText(p))}</span></div>
+      ${money() ? `<p class="purse"><b>${p.coins || 0}</b>枚のお金 · ${moneyStyle(p)}${Object.keys(p.debt || {}).length ? ' · 借金あり' : ''}</p>` : ''}
       <div class="needs"><span>空腹<em><b data-need="hunger" style="width:${p.needs.hunger * 100}%"></b></em></span><span>疲れ<em><b data-need="energy" style="width:${(1 - p.needs.energy) * 100}%"></b></em></span><span>さみしさ<em><b data-need="lonely" style="width:${p.needs.lonely * 100}%"></b></em></span></div>
       <div class="sec"><h4>この人らしさ</h4><div class="persona">${radar(p.traits, 120)}<p>${esc(personaText(p.traits))}${h ? '<br><small style="font-family:var(--sans);font-size:11px;color:var(--ink2)">' + (p.traits.tidy < .42 ? '丸太小屋' : '白壁の家') + 'に住んでいる</small>' : ''}</p></div></div>
       ${good.length || bad.length ? `<div class="sec"><h4>人間関係</h4><div class="chips">${good.map(fchip).join('')}${bad.map(([o]) => `<button class="chip friend guess" data-sel="${o.id}">${portrait(o.look, 20)}${esc(shortName(o))} · 気まずい</button>`).join('')}</div></div>` : ''}
@@ -1536,6 +1791,8 @@ const ui = {
   structInfo(s) {
     const o = byId(s.owner), t = TYPES[s.type];
     if (!s.done) return toast(`${t.name}を建てているところ（${Math.round(s.progress * 100)}%）`);
+    if (s.type === 'stall' && money() && o) return toast(`${nm(o)}の店 · ${o.coins || 0}枚もうけている`);
+    if (s.type === 'house' && (s.lv || 1) > 1) return toast(`${o ? nm(o) + 'の' : ''}${s.lv}階建ての家`);
     toast(s.type === 'house' ? `${o ? nm(o) + 'の家' : '空き家'} · ${s.doneDay}日目に完成` : `${t.name} · 言い出したのは${o ? nm(o) : '今はいない人'} · ${s.doneDay}日目`);
   },
   levelUp(lv) { stampShow(LEVELS[lv].name, '島が広がった', '島の格'); },
@@ -1555,7 +1812,9 @@ let camTarget = null, zoomTo = null, viewOff = 0;
 // ---------- トースト・判子・モーダル ----------
 let toastT;
 function toast(msg) { const t = $('#toast'); t.textContent = fmt(msg); t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+let stampUntil = 0;
 function stampShow(big, small, top) {
+  const now = performance.now(); if (now < stampUntil) { setTimeout(() => stampShow(big, small, top), stampUntil - now + 100); return; } stampUntil = now + 2400;
   const s = $('#stamp'); $('#stampNo').textContent = big; $('#stampName').textContent = small; s.querySelector('small').textContent = top;
   s.classList.remove('go'); void s.offsetWidth; s.classList.add('go');
   navigator.vibrate?.(18);
@@ -1728,7 +1987,7 @@ const SPEEDS = [[0, '停止', '時間を止めました'], [1, '1×', 'ふつう
 function renderSpeed() { $('#speedBtn').innerHTML = SPEEDS[ui.speedIdx][1]; }
 $('#speedBtn').onclick = () => { ui.speedIdx = (ui.speedIdx + 1) % 3; ROOT.speed = ui.speedIdx; renderSpeed(); toast(SPEEDS[ui.speedIdx][2]); };
 $('.brand').onclick = () => islandMenu();
-$('#clock').onclick = () => toast(`${S.day}日目の${timeName(S.time)}。木${S.stock.wood}・石${S.stock.stone}・食べ物${S.stock.food}`);
+$('#clock').onclick = () => toast(`${SEASON_NAME[SEASON]} · ${S.day}日目の${timeName(S.time)}${S.ev && !S.ev.done ? ` · 今日は${EV_NAME[S.ev.k]}` : ''}。木${S.stock.wood}・石${S.stock.stone}・食べ物${S.stock.food}`);
 
 const _t1 = new THREE.Color(), _t2 = new THREE.Color(), DAYTOP = new THREE.Color('#DCE6EC'), NIGHTTOP = new THREE.Color('#151C28'), DAYBOT = new THREE.Color('#F1E8DB'), NIGHTBOT = new THREE.Color('#34405A');
 function updateSky() {
@@ -1740,6 +1999,8 @@ function updateSky() {
 }
 function updateHud() {
   updateSky();
+  const gl = goal(); $('#goalText').textContent = (gl.think ? '💡 ' : '') + gl.t; $('#goalBar').style.width = (gl.f * 100).toFixed(1) + '%';
+  $('#goal').classList.toggle('off', ui.tab !== 'island' || !!ui.selected || formOpen);
   $('#clockText').textContent = `${S.day}日目·${timeName(S.time)}`;
   $('#sunmoon').classList.toggle('night', nightness() > .5);
   const lv = LEVELS[S.level].name;
@@ -1799,11 +2060,16 @@ function switchIsland(id, fresh) {
   toast(fresh ? `${S.name}ができました。図鑑から住人を選んでください` : `${S.name}に来ました`);
   if (away.length) setTimeout(() => showAway(away), 700);
 }
+// 留守のあいだの出来事は、見出し3本の「島の新聞」1枚にまとめる
 function showAway(entries) {
-  if (!entries.length) return;
-  const list = entries.filter(e => e.k !== 'born').slice(-8);
-  if (!list.length) return;
-  modal(`<h3>留守のあいだに</h3><p>あなたが見ていないあいだも、島の時間は進んでいました。</p><div class="away"><ul>${list.map(e => `<li>${esc(fmt(e.text))}</li>`).join('')}</ul></div><div class="acts"><button class="btn primary" data-m="close">島を見る</button></div>`);
+  const list = entries.filter(e => e.k !== 'born'); if (!list.length) return;
+  const pri = e => e.k === 'level' ? 5 : e.k === 'event' ? 4 : e.k === 'build' ? 3 : e.k === 'rel' ? 2 : 1;
+  const top = list.map((e, i) => [e, i]).sort((a, b) => pri(b[0]) - pri(a[0]) || b[1] - a[1]).slice(0, 3).map(x => x[0]);
+  const rich = money() ? S.people.slice().sort((a, b) => (b.coins || 0) - (a.coins || 0))[0] : null;
+  const notes = [list.length > 3 ? `ほかに${list.length - 3}つの出来事` : '', rich && rich.coins ? `いちばんのお金持ちは${esc(shortName(rich))}（${rich.coins}枚）` : '', `${ERAS[S.era || 0].name} · ${SEASON_NAME[SEASON]}`].filter(Boolean).join('　');
+  modal(`<div class="news"><div class="mast"><small>${esc(S.name)}</small><b>島の新聞</b><span>${S.day}日目</span></div>
+    <h3 class="lead">${esc(fmt(top[0].text))}</h3>${top.slice(1).map(e => `<p class="sub">${esc(fmt(e.text))}</p>`).join('')}
+    <p class="notes">${notes}</p></div><div class="acts"><button class="btn primary" data-m="close">島を見る</button></div>`);
 }
 
 // ---------- ループ ----------
@@ -1817,7 +2083,7 @@ function frame(now) {
     view.R += (S.R - view.R) * Math.min(1, rdt * 1.6); if (Math.abs(view.R - S.R) < .01) view.R = S.R;
     buildIsland(); fitShadow();
   } else if (S.pending) { populate(S.pending.r0, S.pending.r1); S.pending = null; }
-  syncScene(rdt, now); lights();
+  syncScene(rdt, now); lights(); skyTick(rdt, now / 1000);
   // カメラ
   const sel = ui.follow && byId(ui.selected);
   if (sel) focusOn(sel.x, sel.z);
@@ -1864,6 +2130,7 @@ function tagsTick() {
     e.classList.toggle('sel', ui.selected === p.id);
     _v.set(p.x, groundH(p.x, p.z), p.z).project(camera);
     if (!e._w) e._w = e.offsetWidth || 60;
+    const sy = (1 - _v.y) / 2 * innerHeight; if (sy < 80 || sy > innerHeight - 100 || Math.abs(_v.x) > 1.05) { e.style.display = 'none'; continue; }
     placed.push({ e, x: (_v.x + 1) / 2 * innerWidth, y: (1 - _v.y) / 2 * innerHeight + 6, w: e._w, o: ui.selected && ui.selected !== p.id ? op * .35 : op });
   }
   // 縦の位置順に並べ、重なる名札は下へ押し出す。画面の端からははみ出させない
@@ -1877,8 +2144,22 @@ function tagsTick() {
   }
   for (const [id, e] of tags) if (!byId(id)) { e.remove(); tags.delete(id); }
 }
+const coins = [];
+function coinPop(p, n) {
+  if (quiet || !p) return;
+  const e = document.createElement('div'); e.className = 'coin'; e.textContent = `+${n}`; $('#bubbles').appendChild(e);
+  coins.push({ e, pid: p.id, life: 1.1 });
+}
 function bubblesTick(dt) {
   tagsTick();
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i], p = byId(c.pid); c.life -= dt;
+    if (!p || c.life <= 0 || p.inside) { c.e.remove(); coins.splice(i, 1); continue; }
+    _v.set(p.x, groundH(p.x, p.z) + 1.05, p.z).project(camera);
+    const k = 1 - c.life / 1.1;
+    c.e.style.transform = `translate(${((_v.x + 1) / 2 * innerWidth).toFixed(1)}px,${((1 - _v.y) / 2 * innerHeight - k * 26).toFixed(1)}px) translate(-50%,-100%) scale(${k < .15 ? .6 + k * 2.6 : 1})`;
+    c.e.style.opacity = Math.min(1, c.life * 2.5);
+  }
   for (const [id, b] of bubs) {
     const p = byId(id), m = objs.people.get(id);
     b.life -= dt;
@@ -1906,4 +2187,4 @@ addEventListener('pagehide', () => { if (!resetting) save(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { });
 
 // 動作確認用
-if (/[?&]debug\b/.test(location.search)) window.__hkc = { get S() { return S; }, simStep, addSamples, openForm, ui, camera, controls };
+if (/[?&]debug\b/.test(location.search)) window.__hkc = { get S() { return S; }, get ROOT() { return ROOT; }, simStep, addSamples, openForm, ui, camera, controls, createPerson, traitsFrom, startEv, goal };

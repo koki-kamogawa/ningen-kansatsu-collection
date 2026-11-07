@@ -182,7 +182,7 @@ input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;bac
 .bub.pop{animation:bpop .32s cubic-bezier(.3,1.6,.5,1)}
 @keyframes bpop{from{scale:.3;opacity:0}to{scale:1;opacity:1}}
 .tag{position:absolute;left:0;top:0;will-change:transform;transition:opacity .2s;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(31,28,25,.82);color:var(--paper);pointer-events:none;white-space:nowrap;max-width:46vw;overflow:hidden;text-overflow:ellipsis}
-#toast{position:fixed;z-index:60;left:50%;top:calc(var(--st) + 66px);transform:translate(-50%,-10px);opacity:0;pointer-events:none;padding:10px 16px;border-radius:14px;font-size:13px;max-width:86vw;text-align:center;line-height:1.55;transition:opacity .25s,transform .3s}
+#toast{position:fixed;z-index:60;left:50%;top:calc(var(--st) + 122px);transform:translate(-50%,-10px);opacity:0;pointer-events:none;padding:10px 16px;border-radius:14px;font-size:13px;max-width:86vw;text-align:center;line-height:1.55;transition:opacity .25s,transform .3s}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 #stamp{position:fixed;z-index:70;left:50%;top:26%;pointer-events:none;opacity:0}
 #stamp::before{content:"";position:absolute;width:240px;height:240px;margin:-120px 0 0 -120px;border-radius:50%;background:radial-gradient(rgba(251,248,243,.6),rgba(251,248,243,0) 70%)}
@@ -272,6 +272,22 @@ body.night .glass{background:rgba(247,243,236,.93)}
 .modal .who h3{font-size:17px}
 .acts.col{flex-direction:column}
 .acts.col .btn{flex:none}
+#goal{position:fixed;z-index:19;left:12px;top:calc(var(--st) + 66px);max-width:calc(100% - 24px);border-radius:999px;padding:7px 14px 8px;font-size:12px;font-weight:700;color:var(--ink);transition:opacity .3s,transform .3s;pointer-events:none}
+#goal.off{opacity:0;transform:translateY(-6px)}
+#goal span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#goal i{display:block;height:4px;border-radius:2px;background:var(--paper-lo);margin-top:5px;overflow:hidden;width:min(220px,60vw)}
+#goal i b{display:block;height:100%;background:var(--stamp);border-radius:2px;transition:width .6s}
+.coin{position:absolute;left:0;top:0;font-size:15px;font-weight:800;color:#B07A12;text-shadow:0 1px 0 #FFF7E0,0 0 6px rgba(255,214,120,.8);pointer-events:none;font-variant-numeric:tabular-nums}
+.coin::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FFE79A,#E0A83A 70%);box-shadow:inset 0 0 0 1.5px #B9821E;margin-right:3px;vertical-align:-1px}
+.purse{margin:10px 2px 0;font-size:13px;color:var(--ink2)}
+.purse b{font-size:17px;color:#9A6A10;font-variant-numeric:tabular-nums;margin-right:2px}
+.news{border-top:3px double var(--ink);border-bottom:1px solid var(--ink);padding:10px 2px 12px;margin-bottom:14px}
+.news .mast{display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--ink);padding-bottom:8px;margin-bottom:12px}
+.news .mast b{font-family:var(--mincho);font-size:24px;letter-spacing:.2em}
+.news .mast small,.news .mast span{font-size:11px;color:var(--ink2)}
+.news .lead{font-family:var(--mincho);font-size:19px;line-height:1.55;margin:0 0 10px;font-weight:700;word-break:keep-all;overflow-wrap:anywhere}
+.news .sub{font-family:var(--mincho);font-size:14px;line-height:1.7;margin:0 0 6px;padding-left:10px;border-left:2px solid var(--line);color:var(--ink);word-break:keep-all;overflow-wrap:anywhere}
+.news .notes{font-size:11.5px;color:var(--ink2);margin:10px 0 0;line-height:1.7}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition-duration:.01s!important}}
 </style>
 </head>
@@ -289,6 +305,8 @@ body.night .glass{background:rgba(247,243,236,.93)}
   <button class="pill glass" id="clock" aria-label="島の時間"><i class="sunmoon" id="sunmoon"></i><span id="clockText">1日目 · 朝</span></button>
   <button class="pill icon glass speed" id="speedBtn" aria-label="時間の速さ"></button>
 </header>
+
+<div id="goal" class="glass off"><span id="goalText"></span><i><b id="goalBar"></b></i></div>
 
 <section id="welcome" class="glass">
   <h1>まだ誰もいない島です。</h1>
